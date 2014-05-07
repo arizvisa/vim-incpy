@@ -1,5 +1,4 @@
-" Incremental Python(?)
-" siflus@gmail.com
+" incremental-python 3.0
 " based on an idea that bniemczyk@gmail.com had
 " thanks to ccliver@gmail.org for his input
 " thanks to Tim Pope <vimNOSPAM@tpope.info> for pointing out preview windows
@@ -21,411 +20,443 @@
 " and hit '!' to execute in the python interpreter. it's output will
 " be displayed in 'python-output'
 "
-" basic knowledge of window management is required to use this effectively
+" ! -- execute current selected row
+" Ctrl+@ -- display repr for symbol under cursor
+" Ctrl+_ -- display help for symbol under cursor
 "
-" Configuration:
-" incpy uses 4 options that are set via global variables.
+" Installation:
+" If in posix, copy to ~/.vim/plugin/
+" If in windows, copy to $USERPROFILE/vimfiles/plugin/
 "
-" string g:PyBufferName      - the name of the output buffer that gets created.
-" string g:PyBufferPlacement - buffer position.  ['above', 'below']
-" string g:PyBufferSize      - Buffer Size on Creation
-" int g:PyEnableHide         - whether to enable support for autohiding
-" int g:PyHideDelay          - the number of keys you'll have to hit before the
-"                              python-output window AutoHides itself
-" int g:PyNewline            - append this number of lines after each execution
+" basic knowledge of window management is required to use effectively. here's
+" a quickref:
+"
+"   <C-w>s -- horizontal split
+"   <C-w>v -- vertical split
+"   <C-w>o -- hide all other windows
+"   <C-w>q -- close current window
+"   <C-w>{h,l,j,k} -- move to the window left,right,down,up from current one
+"
+" Configuration (via globals):
+" string g:incpy#Name           -- the name of the output buffer that gets created.
+" string g:incpy#Program        -- name of subprogram (if empty, use vim's internal python)
+" int    g:incpy#ProgramEcho    -- whether the program should echo all input
+" int    g:incpy#ProgramFollow  -- go to the end of output when input is sent
+" int    g:incpy#ProgramStrip   -- whether to strip leading indent
+" string g:incpy#WindowPosition -- buffer position.  ['above', 'below', 'left', 'right']
+" float  g:incpy#WindowRatio    -- window size on creation
+" dict   g:incpy#WindowOptions  -- new window options
+" int    g:incpy#WindowPreview  -- use preview windows
+"
+" Todo:
+"       the auto-popup of the buffer based on the filetype was pretty cool
+"       if some of the Program output is parsed, it might be possible to
+"           create a fold labelled by the first rw python code that
+"           exec'd it
+"       maybe exeecution of the contents of a register would be useful
+"       merge the main module with the python module so it's portable
+"           and easy to install.
+"       verify everything is cool in the linux-world
 
 if has("python")
-    " initialize some private variables
-    let g:_PyShowAlreadySized = 0
-    let g:_PyHideDelayCount = 0
-    let g:_PyHideSafe = 0
-    let g:_PyShowSetSize = 0
 
-    "" options
-    let PyOptions = {}
+" vim string manipulation for indents and things
+function! s:count_indent(string)
+    " count the beginning whitespace of a string
+    let characters = 0
+    for c in split(a:string,'\zs')
+        if stridx(" \t",c) == -1
+            break
+        endif
+        let characters += 1
+    endfor
+    return characters
+endfunction
 
-    " python buffer
-    let PyOptions['g:PyBufferName'] = 'python-output'
-    let PyOptions['g:PyBufferPlacement'] = 'below'
-
-    " autohide
-    let PyOptions['g:PyEnableHide'] = 1
-    let PyOptions['g:PyHideDelay'] = 10
-
-    " newline
-    let PyOptions['g:PyNewline'] = 1
-
-    if exists('g:PyBufferSize')
-        let g:_PyShowSetSize = 1
-    endif
-
-    if ! exists('g:PyDisable')
-        let g:PyDisable = 1
-    endif
-
-    " set defaults in case they aren't set
-    for k in keys(PyOptions)
-
-        let v = PyOptions[k]
-
-        if type(v) == 1
-            let v = '"'. v .'"'
+function! s:find_common_indent(lines)
+    " find the smallest indent
+    let smallestindent = -1
+    for l in a:lines
+        " skip lines that are all whitespace
+        if strlen(l) == 0 || l =~ '^\s\+$'
+            continue
         endif
 
-        if !exists(k)
-            execute( "let ". k ."=". v )
+        let spaces = s:count_indent(l)
+        if smallestindent < 0 || spaces < smallestindent
+            let smallestindent = spaces
         endif
     endfor
+    return smallestindent
+endfunction
+
+function! s:strip_indentation(lines)
+    let indentsize = s:find_common_indent(a:lines)
+
+    " remove the indent
+    let results = []
+    let prevlength = 0
+    for l in a:lines
+        if strlen(l) == 0
+            let row = repeat(" ",prevlength)
+        else
+            let row = strpart(l,indentsize)
+            let prevlength = s:count_indent(row)
+        endif
+        let results += [row]
+    endfor
+    return results
+endfunction
+
+function! s:selected() range
+    " really, vim? really??
+    let oldvalue = getreg("")
+    normal gvy
+    let result = getreg("")
+    call setreg("", oldvalue)
+    return result
+endfunction
+
+"" private window management
+function! s:windowselect(id)
+    " select the requested windowid, return the previous window id
+    let current = winnr()
+    execute printf("%d wincmd w", a:id)
+    return current
+endfunction
+
+function! s:windowtail(bufid)
+    " tail the window with the requested bufid
+    let last = s:windowselect(bufwinnr(a:bufid))
+    noautocmd normal gg
+    noautocmd normal G
+    call s:windowselect(last)
+endfunction
+
+function! s:currentWindowSize(pos)
+    if a:pos == "left" || a:pos == "right"
+        return winwidth(0)
+    elseif a:pos == "above" || a:pos == "below"
+        return winheight(0)
+    else
+        throw printf("Invalid position %s", a:pos)
+    endif
+endfunction
+
+" internal conversions
+function! s:positionToLocation(pos)
+    if a:pos == "left" || a:pos == "above"
+        return "leftabove"
+    elseif a:pos == "right" || a:pos == "below"
+        return "rightbelow"
+    else
+        throw printf("Invalid position %s", a:pos)
+    endif
+endfunction
+
+function! s:positionToSplit(pos)
+    if a:pos == "left" || a:pos == "right"
+        return "vsplit"
+    elseif a:pos == "above" || a:pos == "below"
+        return "split"
+    else
+        throw printf("Invalid position %s", a:pos)
+    endif
+endfunction
+
+function! s:optionsToCommandLine(options)
+    if type(a:options) != type({})
+        throw printf("Invalid options type %d", type(a:options))
+    endif
+
+    " parse options
+    let result = []
+    for k in keys(a:options)
+        if type(a:options[k]) == type(0)
+            call add(result, printf("%s=%d",k,a:options[k]))
+        elseif type(a:options[k]) == type("")
+            call add(result, printf("%s=%s",k,a:options[k]))
+        else
+            call add(result, printf("%s",k))
+        endif
+    endfor
+    return join(result, "\\ ")
+endfunction
+
+function! s:windowcreate(bufid, pos, size, options)
+    " open the buffer with id /bufid/  at the requested position with options.
+    "   return the buffer-id
+    let current = winnr()
+
+    if g:incpy#WindowPreview > 0
+        if type(a:options) == type({}) && len(a:options) > 0
+            execute printf("noautocmd silent %s pedit! +setlocal\\ %s %s", s:positionToLocation(a:pos), s:optionsToCommandLine(a:options), bufname(a:bufid))
+        else
+            execute printf("noautocmd silent %s pedit! %s", s:positionToLocation(a:pos), bufname(a:bufid))
+        endif
+    else
+        if type(a:options) == type({}) && len(a:options) > 0
+            execute printf("noautocmd silent %s %d%s! +setlocal\\ %s %s", s:positionToLocation(a:pos), a:size, s:positionToSplit(a:pos), s:optionsToCommandLine(a:options), bufname(a:bufid))
+        else
+            execute printf("noautocmd silent %s %d%s! %s", s:positionToLocation(a:pos), a:size, s:positionToSplit(a:pos), bufname(a:bufid))
+        endif
+    endif
+    call s:windowselect(current)
+    return bufwinnr(bufnr(a:bufid))
+endfunction
+
+" bufnr(bufid) -- returns -1 if buffer doesn't exist
+" winnr() -- number of current window
+" bufwinnr(bufid) -- window for bufid
+" winbufnr(winid) -- bufid for window
+
+""" public window management
+function! incpy#WindowCreate(bufid, position, ratio, options)
+    if bufnr(a:bufid) == -1
+        throw printf("Buffer %d does not exist", a:bufid)
+    endif
+    if type(a:ratio) != type(0.0) || a:ratio <= 0.0 || a:ratio >= 1.0
+        throw printf("Invalid ratio type %d (%s)", type(a:ratio), string(a:ratio))
+    endif
+
+    let size = float2nr(floor(s:currentWindowSize(a:position) * a:ratio))
+    let id = s:windowcreate(a:bufid, a:position, size, a:options)
+    let current = s:windowselect(id)
+        let b:lastwindowview = winsaveview()
+        let b:lastwindowsize = winrestcmd()
+    call s:windowselect(current)
+endfunction
+
+function! incpy#WindowShow(bufid, position)
+    if bufnr(a:bufid) == -1
+        throw printf("Buffer %d does not exist", a:bufid)
+    endif
+    if bufwinnr(a:bufid) != -1
+        throw printf("Window for %d is already showing", a:bufid)
+    endif
+
+    let last = winnr()
+        execute printf("noautocmd silent %s %s! %s", s:positionToLocation(a:position), s:positionToSplit(a:position), bufname(a:bufid))
+        execute b:lastwindowsize
+        call winrestview(b:lastwindowview)
+    call s:windowselect(last)
+endfunction
+
+function! incpy#WindowHide(bufid)
+    if bufnr(a:bufid) == -1
+        throw printf("Buffer %d does not exist", a:bufid)
+    endif
+    if bufwinnr(a:bufid) == -1
+        throw printf("Window for %d is already hidden", a:bufid)
+    endif
+
+    let last = s:windowselect(bufwinnr(a:bufid))
+        let b:lastwindowview = winsaveview()
+        let b:lastwindowsize = winrestcmd()
+        if g:incpy#WindowPreview > 0
+            noautocmd silent pclose!
+        else
+            noautocmd silent close!
+        endif
+    call s:windowselect(last)
+endfunction
+
+" incpy methods
+function! incpy#SetupPython(currentscriptpath)
+    python import sys,os,vim
+    for p in split(&runtimepath,",")
+        let p = substitute(p, "\\", "/", "g")
+        let m = substitute(a:currentscriptpath, "\\", "/", "g")
+        if stridx(m, p, 0) == 0
+            execute printf("python sys.path.append('%s/python')", p)
+            return
+        endif
+    endfor
+    throw printf("Unable to determine basepath from script %s",a:currentscript)
+endfunction
+
+""" external interfaces
+function! incpy#Execute(line)
+    execute printf("python __incpy__().execute('%s')", escape(a:line, "'\\"))
+    if g:incpy#ProgramFollow
+        call s:windowtail(g:incpy#BufferId)
+    endif
+endfunction
+function! incpy#Range(begin,end)
+    let lines = getline(a:begin,a:end)
+    if g:incpy#ProgramStrip
+        let lines = s:strip_indentation(lines)
+
+        " if last line starts with whitespace (indented), append a newline
+        if len(lines) > 0 && lines[-1] =~ '^\s\+'
+            let lines += [""]
+        endif
+    endif
+
+    let code_s = join(map(lines, 'escape(v:val, "''\\")'), "\\n")
+    execute printf("python __incpy__().execute('%s')", code_s)
+    if g:incpy#ProgramFollow
+        call s:windowtail(g:incpy#BufferId)
+    endif
+endfunction
+function! incpy#Evaluate(expr)
+    "execute printf("python __incpy__().execute('_=%s;print _')", escape(a:expr, "'\\"))
+    "execute printf("python __incpy__().execute('sys.displayhook(%s)')", escape(a:expr, "'\\"))
+    execute printf("python __incpy__().execute('__builtin__._=%s;print __builtin__._')", escape(a:expr, "'\\"))
+    if g:incpy#ProgramFollow
+        call s:windowtail(g:incpy#BufferId)
+    endif
+endfunction
+function! incpy#Halp(expr)
+    execute printf("python __incpy__().execute('__import__(\\'__builtin__\\').help(%s)')", escape(a:expr, "'\\"))
+endfunction
+
+" Create vim commands
+function! incpy#MapCommands()
+    command PyLine call incpy#Range(line("."),line("."))
+    command PyBuffer call incpy#Range(0,line('$'))
+
+    command -nargs=1 Py call incpy#Execute(<q-args>)
+    command -range PyRange call incpy#Range(<line1>,<line2>)
+
+    " python-specific commands
+    command -nargs=1 PyEval call incpy#Evaluate(<q-args>)
+    command -range PyEvalRange <line1>,<line2>call incpy#Evaluate(s:selected())
+    command -nargs=1 PyHelp call incpy#Halp(<q-args>)
+    command -range PyHelpRange <line1>,<line2>call incpy#Halp(s:selected())
+endfunction
+
+" Setup key mappings
+function! incpy#MapKeys()
+    nmap ! :PyLine<C-M>
+    vmap ! :PyRange<C-M>
+
+    " python-specific mappings
+    nmap <C-@> :call incpy#Evaluate(expand("<cword>"))<C-M>
+    vmap <C-@> :PyEvalRange<C-M>
+    nmap  :call incpy#Halp(expand("<cword>"))<C-M>
+    vmap <C-_> :PyHelpRange<C-M>
+endfunction
+
+" Setup default options
+function! incpy#SetupOptions()
+    let defopts = {
+\        "Name" : "Scratch",
+\        "Program" : "",
+\        "ProgramEcho" : 1,
+\        "ProgramFollow" : 1,
+\        "ProgramStrip" : 1,
+\        "WindowRatio" : 1.0/3,
+\        "WindowPosition" : "below",
+\        "WindowOptions" : {"buftype":"nowrite", "noswapfile":[], "updatecount":0, "nobuflisted":[], "filetype":"python"},
+\        "WindowPreview" : 0,
+\    }
+
+    for o in keys(defopts)
+        if ! exists("g:incpy#{o}")
+            let g:incpy#{o} = defopts[o]
+        endif
+    endfor
+endfunction
+
+" Setup python interface
+function! incpy#Setup()
+    " Setup python interface
 
     python <<EOF
-
+import sys,os,vim,__builtin__
 def __incpy__():
-    '''
-    this function is really a front to hide the interface for
-    incremental python
-    '''
-
-    import os
-    import vim
-
-    ## internal defaults in case the vimscript doesn't specify these options
-    PYOPTIONS = {
-        'pyw-placement' : 'below',
-        'debug' : False
-    }
-
     try:
-        # i'm a dick
         return __incpy__.cache
     except AttributeError:
         pass
 
-    class pyb:
-        '''
-        represents a python buffer and provides an interface that makes it
-        look like a write-only 'file' object
-        '''
-        id = 0  #our id
+    # save current stdin,stdout,stderr states
+    state = sys.stdin,sys.stdout,sys.stderr
+    gvars = vim.vars
 
-        def __init__(self, name):
-            self.name = name
-            self.create()
+    def log(data):
+        _,out,_ = state
+        out.write('incpy.vim : %s\n'% data)
 
-        def get(self):
-            '''go through vim.buffers trying to find ourself'''
-            def _m_file(x):
-                if x.name:
-                    return x.name.endswith(self.name)
-            
-            buf = filter( _m_file, vim.buffers )
-            if not buf:
-                return None
-
-            return buf[0]
-
-        def create(self):
-            '''create our preview window'''
-            vim.command('silent pedit %s'% self.name)
-            self.buffer = self.get()
-            self.id = self.buffer.number
-            vim.command('silent pclose')
-
+    import incpy
+    class __internal(__builtin__.object):
+        def __init__(self):
+            log('choosing internal python backend')
+        def __del__(self):
+            sys.stdin,sys.stdout,sys.stderr = self.state
         def write(self, data):
-            '''for writing'''
+            return self.buffer.write(data)
+        def start(self):
+            log('redirecting sys.{stdin,stdout,stderr} to %s'% repr(self.buffer))
+            _,sys.stdout,sys.stderr = None, self.buffer, self.buffer
+        def stop(self):
+            log('restoring sys.{stdin,stdout,stderr} to %s'% repr(state))
+            sys.stdin,sys.stdout,sys.stderr = state
+        def execute(self, command):
+            if bool(gvars['incpy#ProgramEcho']):
+                self.buffer.write('\n'.join('## %s'% x for x in command.split('\n')) + '\n')
+            exec command in globals()
 
-            # HACK: for some lame reason, vim writes a ['\n'] before any
-            #       printed text. this keeps track of all data that's been
-            #       passed to us and removes the first newline it encounters.
-            #       this has the side effect of breaking output of a single
-            #       '\n'. oh well.
-            try:
-                self.__last__
-            except AttributeError:
-                self.__last__ = []
-
-#            self.buffer[-1:-1] = [repr(type(data)) + repr(data)]
-            if data == '\n':
-                if len(self.__last__) > 0:
-                    self.__last__ = []
-#                    self.buffer[-1:-1] = ['-'*7]
-                    return
-                
-            if PYOPTIONS['debug']:
-                data = ' '.join( map(lambda x: ('%02x'% ord(x)), data) )
-                data = '(%s) %s'%(len(self.__last__), data)
-
-            if len(self.__last__) > 0:
-                self.buffer[-1:-1] = data.split('\n')
-            self.__last__.append(data)
-
-        def clear(self):
-            '''reset our buffer'''
-            self.buffer[:] = ['']
-
-    class pyw(pyb):
-        '''
-        "attempts" to manage a window for keeping it splitscreen
-        '''
-        _size = None
-
-        def __init__(self, name):
-            pyb.__init__(self, name)
-            current = vim.current.window
-
-            self.show()
-            self._switch( self._find(self.id) )
-            vim.command('setlocal buftype=nofile')
-            self.hide()
-
-            self._switch( current )
-            self._size = []
-
-        def _find(self, num=None):
-            '''find window by buffer id'''
-            wins = filter( lambda x: x.buffer.number == num, vim.windows )
-            if not wins:
-                return None
-            return wins[0]
-
-        def _switch(self, window):
-            '''try its best to navigate to the specified window'''
-            count = len(vim.windows)
-            current = vim.current.window
-
-            # start at the top
-            vim.command('%d wincmd k'% count)
-
-            # stop downwards till we can find ourself
-            for i in range(count):
-                if vim.current.window == window:
-                    break
-                vim.command('wincmd j')
-
-            if vim.current.window != window:
-                raise ValueError('unable to find window holding bufffer %d'%window.buffer.id)
-
+    class __external(__builtin__.object):
+        program,instance = None,None
+        def __init__(self):
+            log('choosing external program backend')
         def write(self, data):
-            pyb.write(self, data)
-
-            current = vim.current.window
-            self._switch( self._find(self.id) )
-
-            # HACK: switch to our window and set it as non-modified
-            #       so when a user quits it won't ask us to save it
-            vim.command('setlocal nomodified')
-
-            # HACK: autoscroll to the very end of the file so that user can
-            #       see the output of their python
-            vim.command('normal gg')
-            vim.command('normal G')
-
-            self._switch(current)
-
-        def _savesize(self):
-            window = self._find(self.id)
-            self._size.append( window.height )
-
-        def _getsize(self):
-            return self._size.pop()
-
-        size = property( fget=_getsize )
-
-        def show(self, placement=PYOPTIONS['pyw-placement'], height=None):
-            '''split ourselves into view if we aren't already showing'''
-            v = self._find(self.id)
-            if v:
+            return self.buffer.write(data)
+        def start(self):
+            log("connecting i/o from %s to %s"% (repr(self.program), repr(self.buffer)))
+            self.instance = incpy.vimspawn(self.buffer, self.program)
+        def stop(self):
+            if not self.instance.running:
+                log("refusing to stop already terminated process %s"% repr(self.instance))
                 return
+            log("killing process %s"% repr(self.instance))
+            self.instance.stop()
+            log('disconnecting std i/o from to %s'% repr(self.buffer))
+        def execute(self, command):
+            if bool(gvars['incpy#ProgramEcho']):
+                self.buffer.write('%s\n'% command)
+            return self.instance.write(command + "\n")
 
-            current = vim.current.window
-            vim.command('silent %s pedit %s'% (placement, self.name))
+    def backend(program):
+        if len(program) > 0:
+            res = __external()
+            res.program = program
+            return res 
+        return __internal()
 
-            # set some options
-            window = self._find(self.id)
-            try:
-                if self.size:
-                    window.height = self.size
-            except:
-                pass
+    # determine which backend to choose
+    cache = backend(gvars["incpy#Program"])
 
-            if height:
-                window.height = height
+    # create buffer
+    buf = incpy.buffer.new(gvars["incpy#Name"])
+    gvars["incpy#BufferId"] = buf.number
+    cache.buffer = buf
 
-            self._switch(current)
+    # create window
+    windowcreate = vim.Function('incpy#WindowCreate')
+    windowcreate(buf.number, gvars["incpy#WindowPosition"], gvars["incpy#WindowRatio"], gvars["incpy#WindowOptions"])
 
-        def hide(self):
-            '''destroy our preview window'''
-            vim.command('silent pclose')
+    # start app
+    cache.start()
 
+    __incpy__.cache = cache
+    return __incpy__()
 
-    ## back to __incpy__()
-    ## we're going to create a stash that "looks" like a dict, but has
-    ## 2 extra properties
-    class res(dict):
-        pass
-
-    res.pyw = pyw
-    res.pyb = pyb
-
-    # store it where it will be used
-    __incpy__.cache = res()
-
-    return __incpy__()  # yea, i'm really a dick
-    
 EOF
+endfunction
 
-    """ initialize with all options
-    function PyInit()
-        "" buffer creation
-        execute("python __incpy__()['PYOUT'] = __incpy__().pyw('". g:PyBufferName ."')")
-        execute("python __import__('sys').stdout = __incpy__()['PYOUT']")
+    let s:current_script=expand("<sfile>:p:h")
+    call incpy#SetupOptions()
+    call incpy#SetupPython(s:current_script)
+    call incpy#Setup()
+    call incpy#MapCommands()
+    call incpy#MapKeys()
 
-        "" autohide
-        if g:PyEnableHide == 1
-            autocmd FileType python call PyShow()
-            autocmd CursorMoved * call PyHideCheck()
-        endif
+    autocmd VimEnter * python __incpy__()
+    autocmd VimLeavePre * python __incpy__().stop()
 
-        execute "autocmd BufEnter ". g:PyBufferName ." call PyBufEnter()"
-        execute "autocmd BufLeave ". g:PyBufferName ." call PyBufLeave()"
-    endfunction
-
-    """ Python Evaluation
-    function PyRemoveIndent(lines)
-        " find the smallest indent
-        let indent = -1
-        for l in a:lines
-
-            " skip empty lines
-            if len(l) == 0
-                continue
-            endif
-
-            let spaces = 0
-            for c in split(l, '\zs')
-                if c != ' '
-                    break
-                endif
-                let spaces += 1
-            endfor
-
-            if indent < 0 || spaces < indent
-                let indent = spaces
-            endif
-        endfor
-
-        " remove the indent
-        let results = []
-        for l in a:lines
-            let l = strpart(l, indent)
-            let results += [l]
-        endfor
-
-        return results
-    endfunction
-
-    " evaluate one line of python
-    function PyEval(l)
-        let s = PyRemoveIndent([a:l])
-
-        call PyShow()
-        execute("python __incpy__()['PYOUT'].write('##". escape(s[0], "'") ."')")
-        execute("python ". s[0])
-
-        let c = g:PyNewline
-        while c > 0
-            execute("python __incpy__()['PYOUT'].buffer[-1:-1] = ['\\n']")
-            let c -= 1
-        endwhile
-    endfunction
-
-    " evaluate multiple lines of python
-    function PyRange(begin, end)
-        let lines = PyRemoveIndent( getline(a:begin, a:end) )
-
-        " all together now
-        let code = map( lines, 'escape(v:val, "\\")' )
-        let code_s = join( code, '\n' )
-
-        " all together now
-        let rem = map( lines, '"##" . v:val')
-        let rem_s = join( rem, '\n' )
-
-        call PyShow()
-
-        execute("python __incpy__()['PYOUT'].write('". escape(rem_s, "'") ."')")
-        execute("python exec('". escape(code_s, "'") ."')")
-
-        let c = g:PyNewline
-        while c > 0
-            execute("python __incpy__()['PYOUT'].buffer[-1:-1] = ['\\n']")
-            let c -= 1
-        endwhile
-    endfunction
-
-    " display help for something in our output buffer
-    function PyHelp(arg)
-        execute("python help('". escape(a:arg, "'") ."')")
-    endfunction
-
-    """ python-output window display
-    function PyShow()
-        let g:_PyHideDelayCount = 0
-
-        """ LOL: this is fucking horrible
-        if g:_PyShowSetSize == 1
-            let g:_PyShowSetSize = 0
-            execute("python __incpy__()['PYOUT'].show(placement='". g:PyBufferPlacement ."', height=". g:PyBufferSize .")")
-            return
-        endif
-
-        execute("python __incpy__()['PYOUT'].show(placement='". g:PyBufferPlacement ."')")
-    endfunction
-
-    function PyHide()
-        execute("python __incpy__()['PYOUT'].hide()")
-    endfunction
-
-    "" Auto-Hiding code
-    function PyHideIncDelayCount()
-        if g:_PyHideSafe == 0
-            let g:_PyHideDelayCount += 1
-        endif
-    endfunction
-
-    function PyHideCheck()
-        if g:_PyHideDelayCount < g:PyHideDelay
-            call PyHideIncDelayCount()
-            return 0
-        endif
-
-        let g:_PyHideDelayCount = 0
-        call PyHide()
-        return 1
-    endfunction
-
-    "" Hooks for entry/exit of our python-output buffer
-    function PyBufEnter()
-        let g:_PyHideSafe = 1    
-    endfunction
-    function PyBufLeave()
-        let g:_PyHideSafe = 0
-        let g:_PyHideDelayCount = 0
-        execute("python __incpy__()['PYOUT']._savesize()")
-    endfunction
-
-    " produce some useful commands
-    command -range PyRange call PyRange(<line1>, <line2>)
-    command -nargs=1 Py call PyEval(<q-args>)
-    command -nargs=1 PyHelp call PyHelp(<q-args>)
-    command PyLine call PyRange( line("."), line(".") )
-    command PyBuffer call PyRange( 0, line('$'))
-
-    " default mode maps
-    vmap ! :PyRange<C-M>
-    nmap ! :PyLine<C-M>
-
-    if g:PyDisable == 0
-        call PyInit()
-    endif
+else
+    echoerr "Vim compiled without python support. Unable to initialize plugin from ". expand("<sfile>")
 endif
-
