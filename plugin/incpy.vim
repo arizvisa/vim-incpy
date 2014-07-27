@@ -21,8 +21,8 @@
 " be displayed in 'python-output'
 "
 " ! -- execute current selected row
-" Ctrl+@ -- display repr for symbol under cursor
-" Ctrl+_ -- display help for symbol under cursor
+" Ctrl+@ -- display repr for symbol under character
+" Ctrl+_ -- display help for symbol under character
 "
 " Installation:
 " If in posix, copy to ~/.vim/plugin/
@@ -264,15 +264,25 @@ endfunction
 " incpy methods
 function! incpy#SetupPython(currentscriptpath)
     python import sys,os,vim
+    let m = substitute(a:currentscriptpath, "\\", "/", "g")
+
+    " add the python path using the runtimepath directory that this script is contained in
     for p in split(&runtimepath,",")
         let p = substitute(p, "\\", "/", "g")
-        let m = substitute(a:currentscriptpath, "\\", "/", "g")
         if stridx(m, p, 0) == 0
             execute printf("python sys.path.append('%s/python')", p)
             return
         endif
     endfor
-    throw printf("Unable to determine basepath from script %s",a:currentscript)
+
+    " otherwise, look up from our current script's directory for a python sub-directory
+    let p = finddir("python", m . ";")
+    if isdirectory(p)
+        execute printf("python sys.path.append('%s')", p)
+        return
+    endif
+
+    throw printf("Unable to determine basepath from script %s",m)
 endfunction
 
 """ external interfaces
