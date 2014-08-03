@@ -312,7 +312,8 @@ endfunction
 function! incpy#Evaluate(expr)
     "execute printf("python __incpy__().execute('_=%s;print _')", escape(a:expr, "'\\"))
     "execute printf("python __incpy__().execute('sys.displayhook(%s)')", escape(a:expr, "'\\"))
-    execute printf("python __incpy__().execute('__builtin__._=%s;print __builtin__._')", escape(a:expr, "'\\"))
+    "execute printf("python __incpy__().execute('__builtin__._=%s;print __builtin__._')", escape(a:expr, "'\\"))
+    execute printf("python __incpy__().execute('__builtin__._=%s;print repr(__builtin__._)')", escape(a:expr, "'\\"))
     if g:incpy#ProgramFollow
         call s:windowtail(g:incpy#BufferId)
     endif
