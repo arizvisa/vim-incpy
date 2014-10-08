@@ -417,7 +417,7 @@ def __incpy__():
             return self.buffer.write(data)
         def start(self):
             log("connecting i/o from %s to %s"% (repr(self.program), repr(self.buffer)))
-            self.instance = incpy.vimspawn(self.buffer, self.program)
+            self.instance = incpy.spawn(self.buffer.write, self.program)
         def stop(self):
             if not self.instance.running:
                 log("refusing to stop already terminated process %s"% repr(self.instance))

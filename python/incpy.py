@@ -1,124 +1,129 @@
-import vim as _vim,exceptions,threading
+try:
+    import vim as _vim,exceptions,threading
 
-# vim wrapper
-class vim(object):
-    class _accessor(object):
-        def __init__(self, result):
-            self.result = result
+    # vim wrapper
+    class vim(object):
+        class _accessor(object):
+            def __init__(self, result):
+                self.result = result
 
-        def __get__(self, obj, objtype):
-            return self.result
+            def __get__(self, obj, objtype):
+                return self.result
 
-        def __set__(self, obj, val):
-            self.result = val
+            def __set__(self, obj, val):
+                self.result = val
 
-    _error = _vim.error
-    class error(exceptions.Exception):
-        """because vim is using old-style exceptions based on str"""
+        _error = _vim.error
+        class error(exceptions.Exception):
+            """because vim is using old-style exceptions based on str"""
 
-    buffers = _accessor(_vim.buffers)
-    current = _accessor(_vim.current)
+        buffers = _accessor(_vim.buffers)
+        current = _accessor(_vim.current)
 
-    if (_vim.eval('has("clientserver")')) and False:
+        if (_vim.eval('has("clientserver")')) and False:
+            @classmethod
+            def command(cls, string):
+                escape = ''*16
+                cmd = string.replace('"', r'\"')
+                return _vim.command('call remote_send(v:servername, "%s:%s\n")'% (escape,cmd))
+
+            @classmethod
+            def eval(cls, string):
+                #return _vim.eval(string)
+                cmd = string.replace('"', r'\"')
+                return _vim.eval('remote_expr(v:servername, "%s")'% cmd)
+
+        else:
+            @classmethod
+            def command(cls, string):
+                return _vim.command(string)
+
+            @classmethod
+            def eval(cls, string):
+                return _vim.eval(string)
+
+    # wrapper around vim buffer object
+    class buffer(object):
+        """vim buffer management"""
+        ## instance scope
+        def __init__(self, buffer):
+            assert type(buffer) == type(vim.current.buffer)
+            self.buffer = buffer
+            #self.writing = threading.Lock()
+        def __del__(self):
+            self.__destroy(self.buffer)
+
         @classmethod
-        def command(cls, string):
-            escape = ''*16
-            cmd = string.replace('"', r'\"')
-            return _vim.command('call remote_send(v:servername, "%s:%s\n")'% (escape,cmd))
-
+        def new(cls, name):
+            """Create a new incpy.buffer object named /name/"""
+            buf = cls.__create(name)
+            return cls(buf)
         @classmethod
-        def eval(cls, string):
-            #return _vim.eval(string)
-            cmd = string.replace('"', r'\"')
-            return _vim.eval('remote_expr(v:servername, "%s")'% cmd)
-
-    else:
+        def from_id(cls, id):
+            """Return an incpy.buffer object from a buffer id"""
+            buf = cls.search_id(id)
+            return cls(buf)
         @classmethod
-        def command(cls, string):
-            return _vim.command(string)
+        def from_name(cls, name):
+            """Return an incpy.buffer object from a buffer name"""
+            buf = cls.search_name(name)
+            return cls(buf)
 
+        name = property(fget=lambda s:s.buffer.name)
+        number = property(fget=lambda s:s.buffer.number)
+
+        def __repr__(self):
+            return '<incpy.buffer %d "%s">'%( self.number, self.name )
+
+        ## class methods for helping with vim buffer scope
         @classmethod
-        def eval(cls, string):
-            return _vim.eval(string)
+        def __create(cls, name):
+            vim.command(r'silent! badd %s'% (name,))
+            return cls.search_name(name)
+        @classmethod
+        def __destroy(cls, buffer):
+            # if vim is going down, then it will crash trying to do anything
+            # with python...so if it is, don't try to clean up.
+            if vim.eval('v:dying'):
+                return
+            vim.command(r'silent! bdelete! %d'% buffer.number)
 
-# wrapper around vim buffer object
-class buffer(object):
-    """vim buffer management"""
-    ## instance scope
-    def __init__(self, buffer):
-        assert type(buffer) == type(vim.current.buffer)
-        self.buffer = buffer
-        #self.writing = threading.Lock()
-    def __del__(self):
-        self.__destroy(self.buffer)
+        ## searching buffers
+        @staticmethod
+        def search_name(name):
+            for b in vim.buffers:
+                if b.name is not None and b.name.endswith(name):
+                    return b
+                continue
+            raise vim.error("unable to find buffer '%s'"% name)
+        @staticmethod
+        def search_id(number):
+            for b in vim.buffers:
+                if b.number == number:
+                    return b
+                continue
+            raise vim.error("unable to find buffer %d"% number)
 
-    @classmethod
-    def new(cls, name):
-        """Create a new incpy.buffer object named /name/"""
-        buf = cls.__create(name)
-        return cls(buf)
-    @classmethod
-    def from_id(cls, id):
-        """Return an incpy.buffer object from a buffer id"""
-        buf = cls.search_id(id)
-        return cls(buf)
-    @classmethod
-    def from_name(cls, name):
-        """Return an incpy.buffer object from a buffer name"""
-        buf = cls.search_name(name)
-        return cls(buf)
+        ## editing buffer
+        def write(self, data):
+            #self.writing.acquire()
+            result = iter(data.split('\n'))
+            self.buffer[-1] += result.next()
+            [self.buffer.append(_) for _ in result]
+            #self.writing.release()
 
-    name = property(fget=lambda s:s.buffer.name)
-    number = property(fget=lambda s:s.buffer.number)
-
-    def __repr__(self):
-        return '<incpy.buffer %d "%s">'%( self.number, self.name )
-
-    ## class methods for helping with vim buffer scope
-    @classmethod
-    def __create(cls, name):
-        vim.command(r'silent! badd %s'% (name,))
-        return cls.search_name(name)
-    @classmethod
-    def __destroy(cls, buffer):
-        # if vim is going down, then it will crash trying to do anything
-        # with python...so if it is, don't try to clean up.
-        if vim.eval('v:dying'):
-            return
-        vim.command(r'silent! bdelete! %d'% buffer.number)
-
-    ## searching buffers
-    @staticmethod
-    def search_name(name):
-        for b in vim.buffers:
-            if b.name is not None and b.name.endswith(name):
-                return b
-            continue
-        raise vim.error("unable to find buffer '%s'"% name)
-    @staticmethod
-    def search_id(number):
-        for b in vim.buffers:
-            if b.number == number:
-                return b
-            continue
-        raise vim.error("unable to find buffer %d"% number)
-
-    ## editing buffer
-    def write(self, data):
-        #self.writing.acquire()
-        result = iter(data.split('\n'))
-        self.buffer[-1] += result.next()
-        [self.buffer.append(_) for _ in result]
-        #self.writing.release()
-
-    def clear(self):
-        #self.writing.acquire()
-        self.buffer[:] = ['']
-        #self.writing.release()
+        def clear(self):
+            #self.writing.acquire()
+            self.buffer[:] = ['']
+            #self.writing.release()
+except ImportError:
+    #import logging
+    #logging.warn("%s:unable to import vim module. leaving wrappers undefined.", __name__)
+    pass
 
 # monitoring an external process via a thread
 import os,signal,threading,Queue,subprocess,time
-class spawn(object):
+class process(object):
     """Spawns a program along with a few monitoring threads.
 
     Provides stdout and stderr in the form of Queue.Queue objects to allow for asynchronous reading.
@@ -141,10 +146,10 @@ class spawn(object):
 
         ## monitor threads (which aren't important if python didn't suck with both threads and gc)
         threads = []
-        t,stdout = spawn.monitorPipe('thread-%x-stdout'% program.pid, program.stdout)
+        t,stdout = process.monitorPipe('thread-%x-stdout'% program.pid, program.stdout)
         threads.append(t)
         if not joined:
-            t,stderr = spawn.monitorPipe('thread-%x-stderr'% program.pid, program.stderr)
+            t,stderr = process.monitorPipe('thread-%x-stderr'% program.pid, program.stderr)
             threads.append(t)
         else:
             stderr = None
@@ -252,28 +257,28 @@ class spawn(object):
 
     def __repr__(self):
         if self.running:
-            return '<spawn running pid:%d>'%( self.id )
-        return '<spawn not-running cmd:"%s">'%( self.commandline )
+            return '<process running pid:%d>'%( self.id )
+        return '<process not-running cmd:"%s">'%( self.commandline )
 
 ### interfaces
 import threading
-def vimspawn(buf, command, **kwds):
-    def update(program, frontend):
+def spawn(stdout, command, **options):
+    """Spawn /command/ with the specified /options/. If program writes anything to it's screen, send it to the stdout function.
+
+    If /stderr/ is defined, call stderr with any error output from the program.
+    """
+    def update(program, output, error):
         stdout,stderr = program.stdout,program.stderr
         while program.running:
-            out = stdout.get(block=True)
-            frontend.write(out)
-            #out = ''
-            #while not stdout.empty():
-            #    out += stdout.get()
-            #if out:
-            #    frontend.write(out)
-            #continue
+            if stderr and not stderr.empty():
+                error(stderr.get(block=True))
+            output(stdout.get(block=True))
         return
 
-    kwds.setdefault('joined', True)
-    program = spawn(command, **kwds)
-    updater = threading.Thread(target=update, name="%x-update"% program.id, args=(program,buf,))
+    stderr = options.pop('stderr', lambda s: None)
+    options.setdefault('joined', True)
+    program = process(command, **options)
+    updater = threading.Thread(target=update, name="%x-update"% program.id, args=(program,stdout,stderr))
     updater.daemon = True
     updater.start()
     program.updater = updater
