@@ -263,14 +263,13 @@ endfunction
 
 " incpy methods
 function! incpy#SetupPython(currentscriptpath)
-    python import sys,os,vim
     let m = substitute(a:currentscriptpath, "\\", "/", "g")
 
     " add the python path using the runtimepath directory that this script is contained in
     for p in split(&runtimepath,",")
         let p = substitute(p, "\\", "/", "g")
         if stridx(m, p, 0) == 0
-            execute printf("python sys.path.append('%s/python')", p)
+            execute printf("python __import__('sys').path.append('%s/python')", p)
             return
         endif
     endfor
@@ -278,15 +277,16 @@ function! incpy#SetupPython(currentscriptpath)
     " otherwise, look up from our current script's directory for a python sub-directory
     let p = finddir("python", m . ";")
     if isdirectory(p)
-        execute printf("python sys.path.append('%s')", p)
+        execute printf("python __import__('sys').path.append('%s')", p)
         return
     endif
 
-    throw printf("Unable to determine basepath from script %s",m)
+    throw printf("Unable to determine basepath from script %s", m)
 endfunction
 
 """ external interfaces
 function! incpy#Execute(line)
+    let module = escape("__import__('__builtin__')", "'\\")
     execute printf("python __incpy__().execute('%s')", escape(a:line, "'\\"))
     if g:incpy#ProgramFollow
         call s:windowtail(g:incpy#BufferId)
@@ -313,13 +313,15 @@ function! incpy#Evaluate(expr)
     "execute printf("python __incpy__().execute('_=%s;print _')", escape(a:expr, "'\\"))
     "execute printf("python __incpy__().execute('sys.displayhook(%s)')", escape(a:expr, "'\\"))
     "execute printf("python __incpy__().execute('__builtin__._=%s;print __builtin__._')", escape(a:expr, "'\\"))
-    execute printf("python __incpy__().execute('__builtin__._=%s;print repr(__builtin__._)')", escape(a:expr, "'\\"))
+    let module = escape("__import__('__builtin__')", "'\\")
+    execute printf("python __incpy__().execute('%s._=%s;print %s.repr(%s._)')", module, escape(a:expr, "'\\"), module, module)
     if g:incpy#ProgramFollow
         call s:windowtail(g:incpy#BufferId)
     endif
 endfunction
 function! incpy#Halp(expr)
-    execute printf("python __incpy__().execute('__import__(\\'__builtin__\\').help(%s)')", escape(a:expr, "'\\"))
+    let module = escape("__import__('__builtin__')", "'\\")
+    execute printf("python __incpy__().execute('%s.help(\\'%s\\')')", module, escape(a:expr, "'\\"))
 endfunction
 
 " Create vim commands
@@ -375,12 +377,13 @@ function! incpy#Setup()
     " Setup python interface
 
     python <<EOF
-import sys,os,vim,__builtin__
 def __incpy__():
     try:
         return __incpy__.cache
     except AttributeError:
         pass
+
+    import vim,__builtin__,sys
 
     # save current stdin,stdout,stderr states
     state = sys.stdin,sys.stdout,sys.stderr
@@ -454,7 +457,6 @@ def __incpy__():
 
     __incpy__.cache = cache
     return __incpy__()
-
 EOF
 endfunction
 
