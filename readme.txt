@@ -5,6 +5,8 @@ This allows one to incrementally develop python code, similar to Emacs' SLIME. E
 
 Recently support has been added to use any program and capture it's output into a buffer. This can be specified via a global variable which contains the path to the executable, or python executable. If one is not specified, vim's internal python will be used.
 
+The core of the plugin, python/incpy.py is actually usable outside of vim. This allows python to spawn a process and call a closure upon any kind of i/o that happens via the process. Unfortunately on windows, due to the non-existence of a tty, all processes are created via a pipes therefore you will need to start each program in "interactive-mode". With python, the option is "-i".
+
 Usage:
 Simply get used to doing window management and visual mode. When hilighting some text, hit '!' (bang) to execute currently selected code. This will execute it through python, and output will be captured in a window.
 
@@ -55,6 +57,7 @@ Incpy has a couple options that are set via global variables. These should be se
     let g:incpy#WindowRatio = 1.0/8             (window size as a percentage of current view)
     let g:incpy#WindowPreview = 0               (use vim's preview windows for output window)
     let g:incpy#WindowOptions = {}              (any custom options to add to window)
+    let g:incpy#WindowFixed = 0                 (fix the windows position so that vim won't auto-resize the window)
 
 Installation:
 Python2 support in vim (+python) is required in order to use this. Check :version or run vim with -v to see. This plugin has been tested with vim 7.0.
