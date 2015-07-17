@@ -326,7 +326,7 @@ class interpreter(object):
     def detach(self):
         """Detaches interpreter from view"""
         raise NotImplementedError
-    def communicate(self, command):
+    def communicate(self, command, silent=False):
         """Sends commands to interpreter"""
         raise NotImplementedError
     def start():
@@ -349,8 +349,8 @@ class interpreter_python_internal(__incpy__.interpreter):
         sys = __incpy__.sys
         __incpy__.log('restoring sys.{stdin,stdout,stderr} to %r'% (self.state,))
         sys.stdin,sys.stdout,sys.stderr = self.state
-    def communicate(self, data):
-        if __incpy__.vim.gvars['incpy#ProgramEcho']:
+    def communicate(self, data, silent=False):
+        if __incpy__.vim.gvars['incpy#ProgramEcho'] and not silent:
             self.view.write('\n'.join('## %s'% x for x in data.split('\n')) + '\n')
         exec data in globals()
     def start():
@@ -382,8 +382,8 @@ class interpreter_external(__incpy__.interpreter):
         __incpy__.log('disconnecting i/o for %r from %r'% (self.instance,self.view))
         self.instance = None
 
-    def communicate(self, data):
-        if __incpy__.vim.gvars['incpy#ProgramEcho']:
+    def communicate(self, data, silent=False):
+        if __incpy__.vim.gvars['incpy#ProgramEcho'] and not silent:
             self.view.write(data + '\n')
         self.instance.write(data + "\n")
     def __repr__(self):
@@ -635,6 +635,9 @@ _.create(__incpy__.vim.gvars['incpy#WindowPosition'], __incpy__.vim.gvars['incpy
 
 # delete our temp variable
 del(_)
+
+# import the user module silently to honor any user-specific configurations
+__incpy__.cache.communicate('__import__("user")\n', silent=True)
 EOF
 endfunction
 
