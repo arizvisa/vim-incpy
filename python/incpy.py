@@ -191,7 +191,7 @@ class process(object):
 
     program = None              # subprocess.Popen object
     stdout,stderr = None,None   # queues containing stdout and stderr
-    id = property(fget=lambda s: s.program.pid)
+    id = property(fget=lambda s: s.program and s.program.pid or -1)
     running = property(fget=lambda s: False if s.program is None else s.program.poll() is None)
     threads = property(fget=lambda s: list(s.__threads))
 
@@ -207,15 +207,17 @@ class process(object):
         joined<bool> = True -- if disabled, use separate monitoring pipes/threads for both stdout and stderr.
         shell<bool> = True -- whether to treat program as an argument to a shell, or a path to an executable
         newlines<bool> = True -- allow python to tamper with i/o to convert newlines
-        hidden<bool> = True -- if within a windowed environment, open up a console for the process.
+        show<bool> = False -- if within a windowed environment, open up a console for the process.
+        paused<bool> = False -- if enabled, then don't start the process until .start() is called
         """
         # default properties
         self.__threads = weakref.WeakSet()
         self.__kwds = kwds
         self.commandline = command
+        self.exceptionQueue = self.Queue()
 
         # start the process
-        self.start(command)
+        not kwds.get('paused',False) and self.start(command)
 
     def start(self, command=None):
         command,kwds = command or self.commandline,self.__kwds
@@ -225,7 +227,7 @@ class process(object):
         joined = kwds.get('joined', True)
         newlines = kwds.get('newlines', True)
         shell = kwds.get('shell', False)
-        self.program = process.subprocess(command, cwd, env, newlines, joined=joined, shell=shell, show=kwds.get('hidden', False))
+        self.program = process.subprocess(command, cwd, env, newlines, joined=joined, shell=shell, show=kwds.get('show', False))
         self.commandline = command
 
         # monitor program's i/o
@@ -321,19 +323,25 @@ class process(object):
     def wait(self, timeout=0.0):
         """Wait a given amount of time for the process to terminate"""
         program = self.program
+        if program is None:
+            raise RuntimeError, 'Program %s is not running'% self.commandline
 
         if timeout:
             t = time.time()
-            while t + timeout > time.time():        # spin cpu until we timeout
-                if program.poll() is not None:
-                    return program.returncode
+            while program.poll() is None and t + timeout > time.time():        # spin cpu until we timeout
+                if not self.exceptionQueue.empty():
+                    res = self.exceptionQueue.get()
+                    raise res[0],res[1],res[2]
                 continue
-            return None
+            return program.returncode
 
         # return program.wait() # XXX: doesn't work correctly with PIPEs due to
         #   pythonic programmers' inability to understand os semantics
 
-        while program.poll() is not None:
+        while program.poll() is None:
+            if not self.exceptionQueue.empty():
+                res = self.exceptionQueue.get()
+                raise res[0],res[1],res[2]
             pass    # ugh...poll-forever/kill-cpu until program terminates...
         return program.returncode
 
@@ -344,7 +352,11 @@ class process(object):
             return self.program.poll()
 
         p,_ = self.program,self.program.kill()
-        while p.poll() is not None: pass
+        while p.poll() is not None:
+            if not self.exceptionQueue.empty():
+                res = self.exceptionQueue.get()
+                raise res[0],res[1],res[2]
+            continue
         self.stop_monitoring()
         self.program = None
         return p.returncode
@@ -368,9 +380,9 @@ class process(object):
 
         def forever(iterable):
             while len(iterable) > 0:
-                for n in iterable:
+                for n in list(iterable):
                     yield n
-                del(n)
+                    del(n)
             return
 
         # join all monitoring threads, and spin until none of them are alive
@@ -379,6 +391,11 @@ class process(object):
             if not th.is_alive():
                 self.__threads.discard(th)
             continue
+
+        # pull an exception out of the exceptionQueue if there's any left
+        if not self.exceptionQueue.empty():
+            res = self.exceptionQueue.get()
+            raise res[0],res[1],res[2]
         return
 
     def __repr__(self):
@@ -393,33 +410,51 @@ def spawn(stdout, command, **options):
     If /stderr/ is defined, call stderr with any error output from the program.
     """
     def update(program, output, error, timeout=1.0):
+        # wait until we're running
+        while not program.running: pass
+
+        # empty out the first generator result if one is passed as an output handler
+        hasattr(stdout,'send') and program.write(stdout.send(None) or '')
+        hasattr(stderr,'send') and program.write(stderr.send(None) or '')
+
         while True:
             while program.running:
                 try:
                     if program.stderr and not program.stderr.empty():
-                        error(program.stderr.get(block=True))
-                    output(program.stdout.get(block=True))
+                        data = program.stderr.get(block=True)
+                        program.write(error.send(data) or '') if hasattr(error,'send') else error(data)
+                    data = program.stdout.get(block=True)
+                    program.write(output.send(data) or '') if hasattr(output,'send') else output(data)
+                except StopIteration:
+                    #sys.stderr.write("Update callbacks for %r have raised a StopIteration, stopping process.\n"% (program))
+                    program.stop()
+                    break
                 except:
-                    import traceback
-                    _ = traceback.format_exception( *sys.exc_info() )
-                    sys.stderr.write("Unexpected exception in update thread for %r:\n%s"% (program, '\n'.join(_)) )
-                    time.sleep(1.0)
+                    program.exceptionQueue.put(sys.exc_info())
+                    #import traceback
+                    #_ = traceback.format_exception( *sys.exc_info() )
+                    #sys.stderr.write("Unexpected exception in update thread for %r:\n%s"% (program, '\n'.join(_)) )
                 continue
-            sys.stderr.write("Update loop for %r attempted termination, spinning at %d intervals:\n%s"% (program, timeout))
+            #sys.stderr.write("Program %r has terminated, spinning at %d intervals.\n"% (program, timeout))
             while not program.running: time.sleep(1.0)
         return
 
+    # grab arguments that we care about
     stderr = options.pop('stderr', lambda s: None)
     daemon = options.pop('daemon', True)
     options.setdefault('joined', True)
 
+    # spawn the sub-process
     program = process(command, **options)
 
+    # create the updating thread that dispatches to each handler
     updater = threading.Thread(target=update, name="thread-%x.update"% program.id, args=(program,stdout,stderr))
     updater.daemon = daemon
+    updater.stdout = stdout
+    updater.stderr = stderr
     updater.start()
 
-    program.updater = updater   # keep a publically available ref
+    program.updater = updater   # keep a publically available ref of it
     return program
 
 if __name__ == '__main__':
