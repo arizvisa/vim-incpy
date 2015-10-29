@@ -636,8 +636,6 @@ _.create(__incpy__.vim.gvars['incpy#WindowPosition'], __incpy__.vim.gvars['incpy
 # delete our temp variable
 del(_)
 
-# import the user module silently to honor any user-specific configurations
-__incpy__.cache.communicate('__import__("user")\n', silent=True)
 EOF
 endfunction
 
@@ -648,7 +646,8 @@ endfunction
     call incpy#MapCommands()
     call incpy#MapKeys()
 
-    autocmd VimEnter * python hasattr(__incpy__,'cache') and __incpy__.cache.attach()
+    " on entry, silently import the user module to honor any user-specific configurations
+    autocmd VimEnter * python hasattr(__incpy__,'cache') and __incpy__.cache.attach() or __incpy__.cache.communicate('__import__("user")\n', silent=True)
     autocmd VimLeavePre * python hasattr(__incpy__,'cache') and __incpy__.cache.detach()
 
 else
