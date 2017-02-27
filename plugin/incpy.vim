@@ -38,6 +38,7 @@
 "
 " Configuration (via globals):
 " string g:incpy#Program        -- name of subprogram (if empty, use vim's internal python)
+" string g:incpy#Greenlets      -- whether to use greenlets (lightweight-threads) or not.
 " int    g:incpy#ProgramEcho    -- whether the program should echo all input
 " int    g:incpy#ProgramFollow  -- go to the end of output when input is sent
 " int    g:incpy#ProgramStrip   -- whether to strip leading indent
@@ -250,8 +251,8 @@ function! incpy#MapKeys()
     vmap ! :PyRange<C-M>
 
     " python-specific mappings
-    nmap <C-@> :call incpy#Evaluate(expand("<cword>"))<C-M>
-    vmap <C-@> :PyEvalRange<C-M>
+    nmap <C-\> :call incpy#Evaluate(expand("<cword>"))<C-M>
+    vmap <C-\> :PyEvalRange<C-M>
     nmap  :call incpy#Halp(expand("<cword>"))<C-M>
     vmap <C-_> :PyHelpRange<C-M>
 endfunction
@@ -260,6 +261,7 @@ endfunction
 function! incpy#SetupOptions()
     let defopts = {}
     let defopts["Program"] = ""
+    let defopts["Greenlets"] = 0
     let defopts["ProgramEcho"] = 1
     let defopts["ProgramFollow"] = 1
     let defopts["ProgramStrip"] = 1
@@ -279,8 +281,12 @@ endfunction
 
 " Setup python interface
 function! incpy#Setup()
-    " Setup python interface
+    " Set any the options for the python module part.
+    if g:incpy#Greenlets > 0
+        python __import__('gevent')
+    endif
 
+    " Initialize python __incpy__ namespace
     python <<EOF
 
 # create a pseudo-builtin module
@@ -654,8 +660,15 @@ endfunction
     call incpy#MapKeys()
 
     " on entry, silently import the user module to honor any user-specific configurations
-    autocmd VimEnter * python hasattr(__incpy__,'cache') and __incpy__.cache.attach() or __incpy__.cache.communicate('__import__("user")\n', silent=True)
+    autocmd VimEnter * python hasattr(__incpy__,'cache') and __incpy__.cache.attach()
     autocmd VimLeavePre * python hasattr(__incpy__,'cache') and __incpy__.cache.detach()
+
+    if g:incpy#Greenlets > 0
+        autocmd CursorHold * python __import__('gevent').idle(0.0)
+        autocmd CursorHoldI * python __import__('gevent').idle(0.0)
+        autocmd CursorMoved * python __import__('gevent').idle(0.0)
+        autocmd CursorMovedI * python __import__('gevent').idle(0.0)
+    endif
 
 else
     echoerr "Vim compiled without python support. Unable to initialize plugin from ". expand("<sfile>")

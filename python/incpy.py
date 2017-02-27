@@ -177,7 +177,56 @@ except ImportError:
     #logging.warn("%s:unable to import vim module. leaving wrappers undefined.", __name__)
     pass
 
-import sys,os,threading,weakref,subprocess,time,itertools,operator
+import sys,os,weakref,time,itertools,operator,shlex,logging
+try:
+    if 'gevent' not in sys.modules:
+        raise ImportError
+
+    # FIXME: there's for sure a better way to accomplish this by using a lwt
+    #        for monitoring the target process. this way we can implement a
+    #        timeout if the monitor'd pipes don't produce any data in time.
+    #        if this is the case, then we can just swap back to the main thread
+    #        until the next time we're shuffling.
+    import gevent
+    import gevent.subprocess as subprocess
+    from gevent.queue import Queue
+    from gevent.event import Event
+    HAS_GEVENT = 1
+    __import__('logging').info("%s:gevent module found. using the greenlet friendly version.", __name__)
+
+    # wrapper around greenlet since for some reason my instance of gevent.threading doesn't include a Thread class.
+    class Thread(object):
+        def __init__(self, group=None, target=None, name=None, args=(), kwargs=None, verbose=None):
+            assert group is None
+            f = target or (lambda *a,**k:None)
+            self.__greenlet = res = gevent.spawn(f, *args, **(kwargs or {}))
+            self.__name = name or 'greenlet_{identity:x}({name:s}'.format(name=f.__name__, identity=id(res))
+            self.__daemonic = False
+            self.__verbose = True
+
+        def start(self):
+            return self.__greenlet.start()
+        def stop(self):
+            return self.__greenlet.stop()
+
+        def join(self, timeout=None):
+            return self.__greenlet.join(timeout)
+
+        is_alive = isAlive = lambda self: self.__greenlet.started and not self.__greenlet.ready()
+        isDaemon = lambda self: self.__daemon
+        setDaemon = lambda self, daemonic: setattr(self, '__daemonic', daemonic)
+        getName = lambda self: self.__name
+        setName = lambda self, name: setattr(self, '__name', name)
+
+        daemon = property(fget=isDaemon, fset=setDaemon)
+        ident = name = property(fget=setName, fset=setName)
+
+except ImportError:
+    import subprocess
+    from Queue import Queue
+    from threading import Thread,Event
+    HAS_GEVENT = 0
+    __import__('logging').debug("%s:gevent module not found. using the threading-based version.", __name__)
 
 # monitoring an external process' i/o via threads/queues
 class process(object):
@@ -225,20 +274,22 @@ class process(object):
         self.__updater = None
         self.__threads = weakref.WeakSet()
         self.__kwds = kwds
-        self.commandline = command
 
-        import Queue
-        self.eventWorking = threading.Event()
-        self.__taskQueue = Queue.Queue()
-        self.__exceptionQueue = Queue.Queue()
+        args = shlex.split(command) if isinstance(command, basestring) else command[:]
+        command = args.pop(0)
+        self.command = command, args[:]
+
+        self.eventWorking = Event()
+        self.__taskQueue = Queue()
+        self.__exceptionQueue = Queue()
 
         self.stdout = kwds.pop('stdout')
         self.stderr = kwds.pop('stderr')
 
         # start the process
-        not kwds.get('paused',False) and self.start(command)
+        not kwds.get('paused',False) and self.start()
 
-    def start(self, command=None, **options):
+    def start(self, **options):
         """Start the specified ``command`` with the requested **options"""
         if self.running:
             raise OSError("Process {:d} is still running.".format(self.id))
@@ -247,15 +298,13 @@ class process(object):
 
         kwds = dict(self.__kwds)
         kwds.update(options)
-        command = command or self.commandline
 
         env = kwds.get('env', os.environ)
         cwd = kwds.get('cwd', os.getcwd())
         newlines = kwds.get('newlines', True)
         shell = kwds.get('shell', False)
         stdout,stderr = options.pop('stdout',self.stdout),options.pop('stderr',self.stderr)
-        self.program = process.subprocess(command, cwd, env, newlines, joined=(stderr is None) or stdout == stderr, shell=shell, show=kwds.get('show', False))
-        self.commandline = command
+        self.program = process.subprocess([self.command[0]] + self.command[1], cwd, env, newlines, joined=(stderr is None) or stdout == stderr, shell=shell, show=kwds.get('show', False))
         self.eventWorking.clear()
 
         # monitor program's i/o
@@ -268,7 +317,6 @@ class process(object):
 
     def __start_updater(self, daemon=True, timeout=0):
         """Start the updater thread. **used internally**"""
-        import Queue
         def task_exec(emit, data):
             if hasattr(emit,'send'):
                 res = emit.send(data)
@@ -303,11 +351,11 @@ class process(object):
                 except:
                     P.exceptionQueue.put(sys.exc_info())
                 finally:
-                    P.taskQueue.task_done()
+                    hasattr(P.taskQueue, 'task_done') and P.taskQueue.task_done()
                 continue
             return
 
-        self.__updater = updater = threading.Thread(target=update, name="thread-%x.update"% self.id, args=(self,timeout))
+        self.__updater = updater = Thread(target=update, name="thread-%x.update"% self.id, args=(self,timeout))
         updater.daemon = daemon
         updater.start()
         return updater
@@ -335,16 +383,25 @@ class process(object):
         for t in threads: t.start()
 
     @staticmethod
-    def subprocess(program, cwd, environment, newlines, joined, shell=True, show=False):
+    def subprocess(program, cwd, environment, newlines, joined, shell=False, show=False):
         """Create a subprocess using subprocess.Popen."""
         stderr = subprocess.STDOUT if joined else subprocess.PIPE
+        res = dict(universal_newlines=newlines, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr)
         if os.name == 'nt':
-            si = subprocess.STARTUPINFO()
+            res['startupinfo'] = si = subprocess.STARTUPINFO()
             si.dwFlags = subprocess.STARTF_USESHOWWINDOW
             si.wShowWindow = 0 if show else subprocess.SW_HIDE
-            cf = subprocess.CREATE_NEW_CONSOLE if show else 0
-            return subprocess.Popen(program, universal_newlines=newlines, shell=shell, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr, close_fds=False, startupinfo=si, creationflags=cf, cwd=cwd, env=environment)
-        return subprocess.Popen(program, universal_newlines=newlines, shell=shell, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr, close_fds=True, cwd=cwd, env=environment)
+            res['creationflags'] = cf = subprocess.CREATE_NEW_CONSOLE if show else 0
+            res['close_fds'] = False
+            res.update(dict(close_fds=False, startupinfo=si, creationflags=cf))
+        else:
+            res['close_fds'] = True
+        res['cwd'] = cwd
+        res['env'] = environment
+        res['shell'] = shell
+        command = shlex.split(program) if isinstance(program, basestring) else program[:]
+        try: return subprocess.Popen(command, **res)
+        except OSError: raise OSError("Unable to execute command: {!r}".format(command))
 
     @staticmethod
     def monitorPipe(q, (id,pipe), *more, **options):
@@ -370,8 +427,16 @@ class process(object):
 
         Returns the monitoring threading.thread instance
         """
+
+        # FIXME: if we can make this asychronous on windows, then we can
+        #        probably improve this significantly by either watching for
+        #        a newline (newline buffering), or timing out if no data was
+        #        received after a set period of time. if so, we can implement
+        #        this in a lwt, and swap into and out-of shuffling mode.
         def shuffle(send, pipe):
             while not pipe.closed:
+                # FIXME: would be nice if python devers implemented support for
+                # reading asynchronously or a select.select from an anonymous pipe.
                 data = pipe.read(blocksize)
                 if len(data) == 0:
                     # pipe.read syscall was interrupted. so since we can't really
@@ -380,16 +445,20 @@ class process(object):
                     break
                 map(send,data)
             return
+
+        # create our shuffling thread
         if name:
-            monitorThread = threading.Thread(target=shuffle, name=name, args=(send,pipe))
+            truffle = Thread(target=shuffle, name=name, args=(send,pipe))
         else:
-            monitorThread = threading.Thread(target=shuffle, args=(send,pipe))
-        monitorThread.daemon = daemon
-        return monitorThread
+            truffle = Thread(target=shuffle, args=(send,pipe))
+
+        # ..and set it's daemonicity
+        truffle.daemon = daemon
+        return truffle
 
     def __format_process_state(self):
         if self.program is None:
-            return 'Process "{:s}" {:s}.'.format(self.commandline, 'was never started')
+            return 'Process "{!r}" {:s}.'.format(self.command[0], 'was never started')
         res = self.program.poll()
         return 'Process {:d} {:s}'.format(self.id, 'is still running' if res is None else 'has terminated with code {:d}'.format(res))
 
@@ -417,14 +486,14 @@ class process(object):
         """Grab an exception if there's any in the queue"""
         if self.exceptionQueue.empty(): return
         res = self.exceptionQueue.get()
-        self.exceptionQueue.task_done()
+        hasattr(self.exceptionQueue, 'task_done') and self.exceptionQueue.task_done()
         return res
 
     def wait(self, timeout=0.0):
         """Wait a given amount of time for the process to terminate"""
         program = self.program
         if program is None:
-            raise RuntimeError('Program {:s} is not running.'.format(self.commandline))
+            raise RuntimeError('Program {!r} is not running.'.format(self.command[0]))
 
         if not self.running: return program.returncode
         self.updater.is_alive() and self.eventWorking.wait()
@@ -457,8 +526,13 @@ class process(object):
 
     def __terminate(self):
         """Sends a SIGKILL signal and then waits for program to complete"""
-        self.program.kill()
-        while self.running: continue
+        pid = self.program.pid
+        try:
+            self.program.kill()
+        except OSError:
+            logging.warn("{:s}.__terminate : Error while trying to kill process {:d}. Terminating management threads anyways.".format('.'.join((__name__, self.__class__.__name__)), pid))
+        finally:
+            while self.running: continue
 
         self.__stop_monitoring()
         if self.exceptionQueue.empty():
@@ -504,7 +578,7 @@ class process(object):
 
     def __repr__(self):
         ok = self.exceptionQueue.empty()
-        state = 'running pid:{:d}'.format(self.id) if self.running else 'stopped cmd:"{:s}"'.format(self.commandline)
+        state = 'running pid:{:d}'.format(self.id) if self.running else 'stopped cmd:{!r}"'.format(self.command[0])
         threads = [
             ('updater', 0 if self.updater is None else self.updater.is_alive()),
             ('input/output', len(self.threads))
@@ -512,6 +586,7 @@ class process(object):
         return '<process {:s}{:s} threads{{{:s}}}>'.format(state, (' !exception!' if not ok else ''), ' '.join('{:s}:{:d}'.format(n,v) for n,v in threads))
 
 ## interface for wrapping the process class
+import shlex
 def spawn(stdout, command, **options):
     """Spawn `command` with the specified `**options`.
 
