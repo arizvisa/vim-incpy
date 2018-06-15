@@ -298,7 +298,7 @@ __incpy__.vim,__incpy__.buffer,__incpy__.spawn = __incpy__.incpy.vim,__incpy__.i
 __incpy__.state = __incpy__.builtin.tuple((__incpy__.builtin.getattr(__incpy__.sys,_) for _ in ('stdin','stdout','stderr')))
 def log(data):
     _,out,_ = __incpy__.state
-    out.write('incpy.vim : {:s}\n'.format(data))
+    out.write("incpy.vim : {:s}\n".format(data))
 __incpy__.log = log; del(log)
 
 # interpreter classes
@@ -352,8 +352,8 @@ class interpreter_python_internal(__incpy__.interpreter):
         _,sys.stdout,sys.stderr = None,self.view,self.view
     def detach(self):
         if self.state is None: return
-        sys = __incpy__.sys
-        __incpy__.log("restoring sys.{{stdin,stdout,stderr}} to {!r}".format(self.state))
+        sys, log = __incpy__ and __incpy__.sys or __import__('sys'), lambda message, log=self.state[1].write: log("incpy.vim : {:s}\n".format(message))
+        log("restoring sys.{{stdin,stdout,stderr}} to {!r}".format(self.state))
         sys.stdin,sys.stdout,sys.stderr = self.state
     def communicate(self, data, silent=False):
         if __incpy__.vim.gvars['incpy#ProgramEcho'] and not silent:
@@ -386,7 +386,7 @@ class interpreter_external(__incpy__.interpreter):
             return
         __incpy__.log("killing process {!r}".format(self.instance))
         self.instance.stop()
-        __incpy__.log('disconnecting i/o for {!r} from {!r}'.format(self.instance,self.view))
+        __incpy__.log("disconnecting i/o for {!r} from {!r}".format(self.instance,self.view))
         self.instance = None
 
     def communicate(self, data, silent=False):
@@ -396,8 +396,8 @@ class interpreter_external(__incpy__.interpreter):
     def __repr__(self):
         res = __incpy__.builtin.super(__incpy__.interpreter_external, self).__repr__()
         if self.instance.running:
-            return '{:s} {{{!r} {:s}}}'.format(res, self.instance, self.command)
-        return '{:s} {{{!s}}}'.format(res, self.instance)
+            return "{:s} {{{!r} {:s}}}".format(res, self.instance, self.command)
+        return "{:s} {{{!s}}}".format(res, self.instance)
     def start():
         __incpy__.log("starting process {!r}".format(self.instance))
         self.instance.start()
@@ -508,7 +508,8 @@ class internal(object):
             cls.select(last)
             if not builtin.bool(__incpy__.vim.gvars['incpy#WindowPreview']):
                 wid = cls.buffer(bufferid)
-                assert res == wid,'Newly created window is not pointing to buffer id : {!r} != {!r}'.format(wid, res)
+                if res != wid:
+                    raise AssertionError("Newly created window is not pointing to the correct buffer id : {!r} != {!r}".format(wid, res))
             return res
 
         @__incpy__.builtin.classmethod
@@ -521,7 +522,8 @@ class internal(object):
 
             res = cls.current()
             cls.select(last)
-            assert res == cls.buffer(bufferid)
+            if res != cls.buffer(bufferid):
+                raise AssertionError
             return res
         @__incpy__.builtin.classmethod
         def hide(cls, bufferid, preview=False):
@@ -598,7 +600,7 @@ class view(object):
 
         current = __incpy__.internal.window.current()
         sz = __incpy__.internal.window.currentsize(position) * ratio
-        result = __incpy__.internal.window.create(buf.number, position, sz, self.options, preview=self.preview)
+        result = __incpy__.internal.window.create(buf.number, position, int(sz), self.options, preview=self.preview)
         self.window = result
         return result
 

@@ -106,7 +106,8 @@ try:
         """vim buffer management"""
         ## instance scope
         def __init__(self, buffer):
-            assert type(buffer) == type(vim.current.buffer)
+            if type(buffer) != type(vim.current.buffer):
+                raise AssertionError
             self.buffer = buffer
             #self.writing = threading.Lock()
         def __del__(self):
@@ -197,10 +198,11 @@ try:
     # wrapper around greenlet since for some reason my instance of gevent.threading doesn't include a Thread class.
     class Thread(object):
         def __init__(self, group=None, target=None, name=None, args=(), kwargs=None, verbose=None):
-            assert group is None
+            if group is not None:
+                raise AssertionError
             f = target or (lambda *a,**k:None)
             self.__greenlet = res = gevent.spawn(f, *args, **(kwargs or {}))
-            self.__name = name or 'greenlet_{identity:x}({name:s}'.format(name=f.__name__, identity=id(res))
+            self.__name = name or "greenlet_{identity:x}({name:s}".format(name=f.__name__, identity=id(res))
             self.__daemonic = False
             self.__verbose = True
 
@@ -363,7 +365,7 @@ class process(object):
     def __start_monitoring(self, stdout, stderr=None):
         """Start monitoring threads. **used internally**"""
         program = self.program
-        name = 'thread-{:x}'.format(program.pid)
+        name = "thread-{:x}".format(program.pid)
 
         # create monitoring threads + coroutines
         if stderr:
@@ -414,7 +416,7 @@ class process(object):
             while True: q.put(key+((yield),))
 
         for id,pipe in itertools.chain([(id,pipe)],more):
-            res,name = stuff(q,id), '{:s}<{!r}>'.format(options.get('name',''),id)
+            res,name = stuff(q,id), "{:s}<{!r}>".format(options.get('name',''),id)
             yield process.monitor(res.next() or res.send, pipe, name=name),res
         return
 
@@ -458,29 +460,29 @@ class process(object):
 
     def __format_process_state(self):
         if self.program is None:
-            return 'Process "{!r}" {:s}.'.format(self.command[0], 'was never started')
+            return "Process \"{!r}\" {:s}.".format(self.command[0], 'was never started')
         res = self.program.poll()
-        return 'Process {:d} {:s}'.format(self.id, 'is still running' if res is None else 'has terminated with code {:d}'.format(res))
+        return "Process {:d} {:s}".format(self.id, 'is still running' if res is None else "has terminated with code {:d}".format(res))
 
     def write(self, data):
         """Write `data` directly to program's stdin"""
         if self.running and not self.program.stdin.closed:
             if self.updater and self.updater.is_alive():
                 return self.program.stdin.write(data)
-            raise IOError('Unable to write to stdin for process {:d}. Updater thread has prematurely terminated.'.format(self.id))
-        raise IOError('Unable to write to stdin for process. {:s}.'.format(self.__format_process_state()))
+            raise IOError("Unable to write to stdin for process {:d}. Updater thread has prematurely terminated.".format(self.id))
+        raise IOError("Unable to write to stdin for process. {:s}.".format(self.__format_process_state()))
 
     def close(self):
         """Closes stdin of the program"""
         if self.running and not self.program.stdin.closed:
             return self.program.stdin.close()
-        raise IOError('Unable to close stdin for process. {:s}.'.format(self.__format_process_state()))
+        raise IOError("Unable to close stdin for process. {:s}.".format(self.__format_process_state()))
 
     def signal(self, signal):
         """Raise a signal to the program"""
         if self.running:
             return self.program.send_signal(signal)
-        raise IOError('Unable to raise signal {!r} to process. {:s}.'.format(signal, self.__format_process_state()))
+        raise IOError("Unable to raise signal {!r} to process. {:s}.".format(signal, self.__format_process_state()))
 
     def exception(self):
         """Grab an exception if there's any in the queue"""
@@ -493,7 +495,7 @@ class process(object):
         """Wait a given amount of time for the process to terminate"""
         program = self.program
         if program is None:
-            raise RuntimeError('Program {!r} is not running.'.format(self.command[0]))
+            raise RuntimeError("Program {!r} is not running.".format(self.command[0]))
 
         if not self.running: return program.returncode
         self.updater.is_alive() and self.eventWorking.wait()
@@ -572,18 +574,19 @@ class process(object):
         # join the updater thread, and then remove it
         self.taskQueue.put(None)
         self.updater.join()
-        assert not self.updater.is_alive()
+        if self.updater.is_alive():
+            raise AssertionError
         self.__updater = None
         return
 
     def __repr__(self):
         ok = self.exceptionQueue.empty()
-        state = 'running pid:{:d}'.format(self.id) if self.running else 'stopped cmd:{!r}"'.format(self.command[0])
+        state = "running pid:{:d}".format(self.id) if self.running else "stopped cmd:{!r}".format(self.command[0])
         threads = [
             ('updater', 0 if self.updater is None else self.updater.is_alive()),
             ('input/output', len(self.threads))
         ]
-        return '<process {:s}{:s} threads{{{:s}}}>'.format(state, (' !exception!' if not ok else ''), ' '.join('{:s}:{:d}'.format(n,v) for n,v in threads))
+        return "<process {:s}{:s} threads{{{:s}}}>".format(state, (' !exception!' if not ok else ''), ' '.join("{:s}:{:d}".format(n,v) for n,v in threads))
 
 ## interface for wrapping the process class
 import shlex
