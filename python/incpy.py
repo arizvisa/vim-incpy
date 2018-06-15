@@ -20,7 +20,7 @@ try:
                 except: pass
                 return None   # FIXME: this right?
             def __setitem__(self, name, value):
-                return vim.command('let %s = %s'% (self.prefix+name, vim._to(value)))
+                return vim.command("let {:s} = {:s}".format(self.prefix+name, vim._to(value)))
 
         # converters
         @classmethod
@@ -28,14 +28,14 @@ try:
             if type(n) in (int,long):
                 return str(n)
             if type(n) is float:
-                return '%f'% n
+                return "{:f}".format(n)
             if type(n) is str:
-                return repr(n)
+                return "{!r}".format(n)
             if type(n) is list:
-                return '[%s]'% ','.join(map(cls._to,n))
+                return "[{:s}]".format(','.join(map(cls._to,n)))
             if type(n) is dict:
-                return '{%s}'% ','.join((':'.join((cls._to(k),cls._to(v))) for k,v in n.iteritems()))
-            raise Exception, "Unknown type %s : %r"%(type(n),n)
+                return "{{{:s}}}".format(','.join((':'.join((cls._to(k),cls._to(v))) for k,v in n.iteritems())))
+            raise Exception, "Unknown type {:s} : {!r}".format(type(n),n)
 
         @classmethod
         def _from(cls, n):
@@ -69,12 +69,12 @@ try:
             @classmethod
             def command(cls, string):
                 cmd,escape = string.replace('"', r'\"'), ''*16
-                return _vim.command('call remote_send(v:servername, "%s:%s\n")'% (escape,cmd))
+                return _vim.command("call remote_send(v:servername, \"{:s}:{:s}\n\")".format(escape,cmd))
 
             @classmethod
             def eval(cls, string):
                 cmd = string.replace('"', r'\"')
-                return cls._from(_vim.eval('remote_expr(v:servername, "%s")'% cmd))
+                return cls._from(_vim.eval("remote_expr(v:servername, \"{:s}\")".format(cmd)))
 
         else:
             @classmethod
@@ -97,7 +97,7 @@ try:
             @classmethod
             def Function(cls, name):
                 def caller(*args):
-                    return cls.command("call %s(%s)"%(name,','.join(map(cls._to,args))))
+                    return cls.command("call {:s}({:s})".format(name,','.join(map(cls._to,args))))
                 caller.__name__ = name
                 return caller
 
@@ -134,19 +134,19 @@ try:
         number = property(fget=lambda s:s.buffer.number)
 
         def __repr__(self):
-            return '<incpy.buffer %d "%s">'%( self.number, self.name )
+            return "<incpy.buffer {:d} \"{:s}\">".format(self.number, self.name)
 
         ## class methods for helping with vim buffer scope
         @classmethod
         def __create(cls, name):
-            vim.command(r'silent! badd %s'% (name,))
+            vim.command("silent! badd {:s}".format(name))
             return cls.search_name(name)
         @classmethod
         def __destroy(cls, buffer):
             # if vim is going down, then it will crash trying to do anything
             # with python...so if it is, don't try to clean up.
             if vim.vvars['dying']: return
-            vim.command(r'silent! bdelete! %d'% buffer.number)
+            vim.command("silent! bdelete! {:d}".format(buffer.number))
 
         ## searching buffers
         @staticmethod
@@ -155,14 +155,14 @@ try:
                 if b.name is not None and b.name.endswith(name):
                     return b
                 continue
-            raise vim.error("unable to find buffer '%s'"% name)
+            raise vim.error("unable to find buffer '{:s}'".format(name))
         @staticmethod
         def search_id(number):
             for b in vim.buffers:
                 if b.number == number:
                     return b
                 continue
-            raise vim.error("unable to find buffer %d"% number)
+            raise vim.error("unable to find buffer {:d}".format(number))
 
         ## editing buffer
         def write(self, data):
@@ -174,7 +174,7 @@ try:
 
 except ImportError:
     #import logging
-    #logging.warn("%s:unable to import vim module. leaving wrappers undefined.", __name__)
+    #logging.warn("{:s}:unable to import vim module. leaving wrappers undefined.", __name__)
     pass
 
 import sys,os,weakref,time,itertools,operator,shlex,logging
@@ -192,7 +192,7 @@ try:
     from gevent.queue import Queue
     from gevent.event import Event
     HAS_GEVENT = 1
-    __import__('logging').info("%s:gevent module found. using the greenlet friendly version.", __name__)
+    __import__('logging').info("{:s}:gevent module found. using the greenlet friendly version.", __name__)
 
     # wrapper around greenlet since for some reason my instance of gevent.threading doesn't include a Thread class.
     class Thread(object):
@@ -226,7 +226,7 @@ except ImportError:
     from Queue import Queue
     from threading import Thread,Event
     HAS_GEVENT = 0
-    __import__('logging').debug("%s:gevent module not found. using the threading-based version.", __name__)
+    __import__('logging').debug("{:s}:gevent module not found. using the threading-based version.", __name__)
 
 # monitoring an external process' i/o via threads/queues
 class process(object):
@@ -355,7 +355,7 @@ class process(object):
                 continue
             return
 
-        self.__updater = updater = Thread(target=update, name="thread-%x.update"% self.id, args=(self,timeout))
+        self.__updater = updater = Thread(target=update, name="thread-{:x}.update".format(self.id), args=(self,timeout))
         updater.daemon = daemon
         updater.start()
         return updater
