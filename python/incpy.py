@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger('incpy').getChild('py')
+
 try:
     import vim as _vim,exceptions
 
@@ -174,9 +177,7 @@ try:
         def clear(self): self.buffer[:] = ['']
 
 except ImportError:
-    #import logging
-    #logging.warn("{:s}:unable to import vim module. leaving wrappers undefined.", __name__)
-    pass
+    logger.warn("unable to import vim module. leaving wrappers undefined.")
 
 import sys,os,weakref,time,itertools,operator,shlex,logging
 try:
@@ -193,7 +194,7 @@ try:
     from gevent.queue import Queue
     from gevent.event import Event
     HAS_GEVENT = 1
-    __import__('logging').info("{:s}:gevent module found. using the greenlet friendly version.", __name__)
+    logger.info("discovered gevent module. using the greenlet version of spawn.")
 
     # wrapper around greenlet since for some reason my instance of gevent.threading doesn't include a Thread class.
     class Thread(object):
@@ -228,7 +229,7 @@ except ImportError:
     from Queue import Queue
     from threading import Thread,Event
     HAS_GEVENT = 0
-    __import__('logging').debug("{:s}:gevent module not found. using the threading-based version.", __name__)
+    logger.warn("gevent module not found. using the thread-based version of spawn.")
 
 # monitoring an external process' i/o via threads/queues
 class process(object):
@@ -532,7 +533,7 @@ class process(object):
         try:
             self.program.kill()
         except OSError:
-            logging.warn("{:s}.__terminate : Error while trying to kill process {:d}. Terminating management threads anyways.".format('.'.join((__name__, self.__class__.__name__)), pid))
+            logger.fatal("{:s}.__terminate : Error while trying to kill process {:d}. Terminating management threads anyways.".format('.'.join((__name__, self.__class__.__name__)), pid))
         finally:
             while self.running: continue
 

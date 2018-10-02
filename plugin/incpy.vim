@@ -37,11 +37,13 @@
 "   <C-w>{h,l,j,k} -- move to the window left,right,down,up from current one
 "
 " Configuration (via globals):
-" string g:incpy#Program        -- name of subprogram (if empty, use vim's internal python)
-" string g:incpy#Greenlets      -- whether to use greenlets (lightweight-threads) or not.
-" int    g:incpy#ProgramEcho    -- whether the program should echo all input
-" int    g:incpy#ProgramFollow  -- go to the end of output when input is sent
-" int    g:incpy#ProgramStrip   -- whether to strip leading indent
+" string g:incpy#Program      -- name of subprogram (if empty, use vim's internal python)
+" int    g:incpy#Greenlets    -- whether to use greenlets (lightweight-threads) or not.
+" int    g:incpy#OutputFollow -- go to the end of output when input is sent
+" string g:incpy#InputFormat  -- when executing a command, what to terminate it with
+" int    g:incpy#InputStrip   -- whether to strip leading indent
+" int    g:incpy#Echo         -- whether the plugin should echo all input to the program
+" string g:incpy#EchoFormat   -- the formatspec to execute each line with
 "
 " string g:incpy#WindowName     -- the name of the output buffer that gets created.
 " int    g:incpy#WindowFixed    -- don't allow automatic resizing of the window
@@ -170,6 +172,10 @@ function! incpy#SetupPython(currentscriptpath)
 
     " FIXME: use sys.meta_path
 
+    " setup the default logger
+    python __import__('logging').basicConfig()
+    python __import__('logging').getLogger('incpy')
+
     " add the python path using the runtimepath directory that this script is contained in
     for p in split(&runtimepath,",")
         let p = substitute(p, "\\", "/", "g")
@@ -193,24 +199,19 @@ endfunction
 function! incpy#Execute(line)
     let module = escape("__import__('__builtin__')", "'\\")
     execute printf("python __incpy__.cache.communicate('%s')", escape(a:line, "'\\"))
-    if g:incpy#ProgramFollow
+    if g:incpy#OutputFollow
         call s:windowtail(g:incpy#BufferId)
     endif
 endfunction
 function! incpy#Range(begin,end)
     let lines = getline(a:begin,a:end)
-    if g:incpy#ProgramStrip
+    if g:incpy#InputStrip
         let lines = s:strip_indentation(lines)
-
-        " if last line starts with whitespace (indented), append a newline
-        if len(lines) > 0 && lines[-1] =~ '^\s\+'
-            let lines += [""]
-        endif
     endif
 
     let code_s = join(map(lines, 'escape(v:val, "''\\")'), "\\n")
     execute printf("python __incpy__.cache.communicate('%s')", code_s)
-    if g:incpy#ProgramFollow
+    if g:incpy#OutputFollow
         call s:windowtail(g:incpy#BufferId)
     endif
 endfunction
@@ -220,7 +221,7 @@ function! incpy#Evaluate(expr)
     "execute printf("python __incpy__.cache.communicate('__incpy__.builtin._=%s;print __incpy__.__builtin__._')", escape(a:expr, "'\\"))
     let module = escape("__import__('__builtin__')", "'\\")
     execute printf("python __incpy__.cache.communicate('%s._=%s;print %s.repr(%s._)')", module, escape(a:expr, "'\\"), module, module)
-    if g:incpy#ProgramFollow
+    if g:incpy#OutputFollow
         call s:windowtail(g:incpy#BufferId)
     endif
 endfunction
@@ -262,9 +263,9 @@ function! incpy#SetupOptions()
     let defopts = {}
     let defopts["Program"] = ""
     let defopts["Greenlets"] = 0
-    let defopts["ProgramEcho"] = 1
-    let defopts["ProgramFollow"] = 1
-    let defopts["ProgramStrip"] = 1
+    let defopts["Echo"] = 1
+    let defopts["OutputFollow"] = 1
+    let defopts["InputStrip"] = 1
     let defopts["WindowName"] = "Scratch"
     let defopts["WindowRatio"] = 1.0/3
     let defopts["WindowPosition"] = "below"
@@ -284,6 +285,8 @@ function! incpy#Setup()
     " Set any the options for the python module part.
     if g:incpy#Greenlets > 0
         python __import__('gevent')
+    elseif g:incpy#Program != ""
+        echohl WarningMsg | echomsg "WARNING:incpy.vim:Using vim-incpy to run an external program without support for greenlets will be unstable" | echohl None
     endif
 
     " Initialize python __incpy__ namespace
@@ -296,10 +299,7 @@ __incpy__.vim,__incpy__.buffer,__incpy__.spawn = __incpy__.incpy.vim,__incpy__.i
 
 # save initial state
 __incpy__.state = __incpy__.builtin.tuple((__incpy__.builtin.getattr(__incpy__.sys,_) for _ in ('stdin','stdout','stderr')))
-def log(data):
-    _,out,_ = __incpy__.state
-    out.write("incpy.vim : {:s}\n".format(data))
-__incpy__.log = log; del(log)
+__incpy__.logger = __import__('logging').getLogger('incpy').getChild('vim')
 
 # interpreter classes
 class interpreter(object):
@@ -346,24 +346,47 @@ __incpy__.interpreter = interpreter; del(interpreter)
 class interpreter_python_internal(__incpy__.interpreter):
     state = None
     def attach(self):
-        sys = __incpy__.sys
-        self.state = sys.stdin,sys.stdout,sys.stderr
-        __incpy__.log("redirecting sys.{{stdin,stdout,stderr}} to {!r}".format(self.view))
+        sys, logging, logger = __incpy__.sys, __import__('logging'), __incpy__.logger
+        self.state = sys.stdin,sys.stdout,sys.stderr,logger
+
+        # notify the user
+        logger.debug("redirecting sys.{{stdin,stdout,stderr}} to {!r}".format(self.view))
+
+        # add a handler for python output window so that it catches everything
+        res = logging.StreamHandler(self.view)
+        res.setFormatter(logging.Formatter(logging.BASIC_FORMAT, None))
+        logger.root.addHandler(res)
+
         _,sys.stdout,sys.stderr = None,self.view,self.view
     def detach(self):
         if self.state is None: return
-        sys, log = __incpy__ and __incpy__.sys or __import__('sys'), lambda message, log=self.state[1].write: log("incpy.vim : {:s}\n".format(message))
-        log("restoring sys.{{stdin,stdout,stderr}} to {!r}".format(self.state))
-        sys.stdin,sys.stdout,sys.stderr = self.state
+
+        sys, logging = __incpy__ and __incpy__.sys or __import__('sys'), __import__('logging')
+        _, _, err, logger = self.state
+
+        # notify the user
+        logger.debug("restoring sys.{{stdin,stdout,stderr}} to {!r}".format(self.state))
+
+        # remove the python output window formatter from the root logger
+        try:
+            logger.root.removeHandler(next(L for L in logger.root.handlers if isinstance(L, logging.StreamHandler) and type(L.stream).__name__ == 'view'))
+        except StopIteration:
+            pass
+
+        sys.stdin,sys.stdout,sys.stderr,_ = self.state
     def communicate(self, data, silent=False):
-        if __incpy__.vim.gvars['incpy#ProgramEcho'] and not silent:
-            cmt = "## {:s}".format
-            self.view.write('\n'.join(map(cmt, data.split('\n'))) + '\n')
-        exec data in __incpy__.builtin.globals()
+        inputformat = __incpy__.vim.gvars.get('incpy#InputFormat', '{}\n')
+        if __incpy__.vim.gvars['incpy#Echo'] and not silent:
+            echoformat = __incpy__.vim.gvars.get('incpy#EchoFormat', "# >>> {}")
+            echo = '\n'.join(map(echoformat.format, data.split('\n')))
+            echo = inputformat.format(echo)
+            self.view.write(echo)
+        input = data
+        exec input in __incpy__.builtin.globals()
     def start():
-        __incpy__.log('python interpreter already started by host vim process')
+        __incpy__.logger.warn("vim's internal python interpreter has already been started")
     def stop():
-        __incpy__.log('not allowed to stop internal python interpreter')
+        __incpy__.logger.fatal("refusing to stop vim's internal python interpreter")
 __incpy__.interpreter_python_internal = interpreter_python_internal; del(interpreter_python_internal)
 
 # external interpreter (newline delimited)
@@ -376,33 +399,39 @@ class interpreter_external(__incpy__.interpreter):
         res.command,res.options = command,options
         return res
     def attach(self):
-        __incpy__.log("connecting i/o from {!r} to {!r}".format(self.command, self.view))
+        __incpy__.logger.debug("connecting i/o from {!r} to {!r}".format(self.command, self.view))
         self.instance = __incpy__.spawn(self.view.write, self.command, **self.options)
-        __incpy__.log("started process -- {:d} ({:#x}) -- {:s}".format(self.instance.id,self.instance.id,self.command))
+        __incpy__.logger.info("started process {:d} ({:#x}): {:s}".format(self.instance.id,self.instance.id,self.command))
     def detach(self):
-        if not self.instance: return
-        if not self.instance.running:
-            __incpy__.log("refusing to stop already terminated process {!r}".format(self.instance))
+        if not self.instance:
             return
-        __incpy__.log("killing process {!r}".format(self.instance))
+        if not self.instance.running:
+            __incpy__.logger.fatal("refusing to stop already terminated process {!r}".format(self.instance))
+            return
+        __incpy__.logger.info("killing process {!r}".format(self.instance))
         self.instance.stop()
-        __incpy__.log("disconnecting i/o for {!r} from {!r}".format(self.instance,self.view))
+        __incpy__.logger.debug("disconnecting i/o for {!r} from {!r}".format(self.instance,self.view))
         self.instance = None
 
     def communicate(self, data, silent=False):
-        if __incpy__.vim.gvars['incpy#ProgramEcho'] and not silent:
-            self.view.write(data + '\n')
-        self.instance.write(data + "\n")
+        inputformat = __incpy__.vim.gvars.get('incpy#InputFormat', '{}\n')
+        if __incpy__.vim.gvars['incpy#Echo'] and not silent:
+            echoformat = __incpy__.vim.gvars.get('incpy#EchoFormat', "{}")
+            echo = echoformat.format(data)
+            echo = inputformat.format(data)
+            self.view.write(echo)
+        input = inputformat.format(data)
+        self.instance.write(input)
     def __repr__(self):
         res = __incpy__.builtin.super(__incpy__.interpreter_external, self).__repr__()
         if self.instance.running:
             return "{:s} {{{!r} {:s}}}".format(res, self.instance, self.command)
         return "{:s} {{{!s}}}".format(res, self.instance)
     def start():
-        __incpy__.log("starting process {!r}".format(self.instance))
+        __incpy__.logger.info("starting process {!r}".format(self.instance))
         self.instance.start()
     def stop():
-        __incpy__.log("stopping process {!r}".format(self.instance))
+        __incpy__.logger.info("stopping process {!r}".format(self.instance))
         self.instance.stop()
 __incpy__.interpreter_external = interpreter_external; del(interpreter_external)
 
@@ -636,11 +665,8 @@ opt = {'winfixwidth':True,'winfixheight':True} if __incpy__.vim.gvars["incpy#Win
 try:
     __incpy__.cache = __incpy__.interpreter_external.new(_, opt=opt) if len(_) > 0 else __incpy__.interpreter_python_internal.new(opt=opt)
 except:
-    __incpy__.log("Error instantiating interpreter: {:s}".format(_))
-    _ = __import__('sys').exc_info()
-    _ = __import__('traceback').format_exception(*_)
-    __incpy__.log('\n'.join(_))
-    __incpy__.log("Falling back to default interpreter_python_internal")
+    __incpy__.logger.fatal("error starting external interpreter: {:s}".format(_), exc_info=True)
+    __incpy__.logger.warn("falling back to internal python interpreter")
     __incpy__.cache = __incpy__.interpreter_python_internal.new(opt=opt)
 del(opt)
 
