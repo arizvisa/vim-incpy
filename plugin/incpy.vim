@@ -197,7 +197,6 @@ endfunction
 
 """ external interfaces
 function! incpy#Execute(line)
-    let module = escape("__import__('__builtin__')", "'\\")
     execute printf("python __incpy__.cache.communicate('%s')", escape(a:line, "'\\"))
     if g:incpy#OutputFollow
         call s:windowtail(g:incpy#BufferId)
@@ -284,8 +283,10 @@ endfunction
 function! incpy#Setup()
     " Set any the options for the python module part.
     if g:incpy#Greenlets > 0
+        " If greenlets were specified, then enable it by importing 'gevent' into the current python environment
         python __import__('gevent')
     elseif g:incpy#Program != ""
+        " Otherwise we only need to warn the user that they should use it if they're trying to run an external program
         echohl WarningMsg | echomsg "WARNING:incpy.vim:Using vim-incpy to run an external program without support for greenlets will be unstable" | echohl None
     endif
 
