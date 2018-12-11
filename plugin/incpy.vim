@@ -44,6 +44,7 @@
 " int    g:incpy#InputStrip   -- whether to strip leading indent
 " int    g:incpy#Echo         -- whether the plugin should echo all input to the program
 " string g:incpy#EchoFormat   -- the formatspec to execute each line with
+" string g:incpy#HelpFormat   -- the formatspec to execute help with
 "
 " string g:incpy#WindowName     -- the name of the output buffer that gets created.
 " int    g:incpy#WindowFixed    -- don't allow automatic resizing of the window
@@ -153,6 +154,13 @@ function! s:windowtail(bufid)
     endif
 endfunction
 
+function! s:singleline(string, escape)
+    " escape the multiline string with the specified characters and return it as a single-line string
+    let escaped = escape(a:string, a:escape)
+    let result = substitute(escaped, "\n", "\\\\n", "g")
+    return result
+endfunction
+
 function! incpy#Start()
     python __incpy__.cache.start()
 endfunction
@@ -225,9 +233,11 @@ function! incpy#Evaluate(expr)
     endif
 endfunction
 function! incpy#Halp(expr)
+    " Remove all encompassing whitespace from expression
     let LetMeSeeYouStripped = substitute(a:expr, '^[ \t\n]\+\|[ \t\n]\+$', '', 'g')
-    let module = escape("__import__('__builtin__')", "'\\")
-    execute printf("python try:__incpy__.cache.communicate('%s.help(%s)')\nexcept __incpy__.builtin.SyntaxError:__incpy__.cache.communicate('%s.help(\\'%s\\')')", module, escape(LetMeSeeYouStripped, "'\\"), module, escape(LetMeSeeYouStripped, "'\\"))
+
+    " Pass g:incpy#HelpFormat to incpy's communicator
+    execute printf("python __incpy__.cache.communicate(\"%s\".format(\"%s\"))", s:singleline(g:incpy#HelpFormat, "\"\\"), escape(LetMeSeeYouStripped, "\"\\"))
 endfunction
 
 " Create vim commands
@@ -271,6 +281,8 @@ function! incpy#SetupOptions()
     let defopts["WindowOptions"] = {"buftype":"nowrite", "noswapfile":[], "updatecount":0, "nobuflisted":[], "filetype":"python"}
     let defopts["WindowPreview"] = 0
     let defopts["WindowFixed"] = 0
+    let python_builtins = "__import__(\"__builtin__\")"
+    let defopts["HelpFormat"] = printf("try:exec(\"%s.help({0})\")\nexcept SyntaxError:%s.help(\"{0}\")", escape(python_builtins, "\"\\"), python_builtins)
 
     for o in keys(defopts)
         if ! exists("g:incpy#{o}")
