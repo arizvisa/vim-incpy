@@ -45,6 +45,7 @@
 " int    g:incpy#Echo         -- whether the plugin should echo all input to the program
 " string g:incpy#EchoFormat   -- the formatspec to execute each line with
 " string g:incpy#HelpFormat   -- the formatspec to execute help with
+" string g:incpy#EvalFormat   -- the formatspec to evaluate a single expression with
 "
 " string g:incpy#WindowName     -- the name of the output buffer that gets created.
 " int    g:incpy#WindowFixed    -- don't allow automatic resizing of the window
@@ -223,11 +224,7 @@ function! incpy#Range(begin,end)
     endif
 endfunction
 function! incpy#Evaluate(expr)
-    "execute printf("python __incpy__.cache.communicate('_=%s;print _')", escape(a:expr, "'\\"))
-    "execute printf("python __incpy__.cache.communicate('__incpy__.sys.displayhook(%s)')", escape(a:expr, "'\\"))
-    "execute printf("python __incpy__.cache.communicate('__incpy__.builtin._=%s;print __incpy__.__builtin__._')", escape(a:expr, "'\\"))
-    let module = escape("__import__('__builtin__')", "'\\")
-    execute printf("python __incpy__.cache.communicate('%s._=%s;print %s.repr(%s._)')", module, escape(a:expr, "'\\"), module, module)
+    execute printf("python __incpy__.cache.communicate(\"%s\".format(\"%s\"))", s:singleline(g:incpy#EvalFormat, "\"\\"), escape(a:expr, "\"\\"))
     if g:incpy#OutputFollow
         call s:windowtail(g:incpy#BufferId)
     endif
@@ -283,6 +280,10 @@ function! incpy#SetupOptions()
     let defopts["WindowFixed"] = 0
     let python_builtins = "__import__(\"__builtin__\")"
     let defopts["HelpFormat"] = printf("try:exec(\"%s.help({0})\")\nexcept SyntaxError:%s.help(\"{0}\")", escape(python_builtins, "\"\\"), python_builtins)
+    " let defopts["EvalFormat"] = printf("_={};print _')", python_builtins, python_builtins, python_builtins)
+    " let defopts["EvalFormat"] = printf("__incpy__.sys.displayhook({})')")
+    " let defopts["EvalFormat"] = printf("__incpy__.builtin._={};print __incpy__.__builtin__._")
+    let defopts["EvalFormat"] = printf("%s._={};print %s.repr(%s._)", python_builtins, python_builtins, python_builtins)
 
     for o in keys(defopts)
         if ! exists("g:incpy#{o}")
