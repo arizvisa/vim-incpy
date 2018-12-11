@@ -229,7 +229,7 @@ try:
 
 except ImportError:
     HAS_GEVENT = 0
-    logger.warn('the gevent module was not found within the current environment. using the thread-based variation of spawn.')
+    logger.info('the gevent module was not found within the current environment. using the thread-based variation of spawn.')
 
     class Asynchronous:
         import threading
