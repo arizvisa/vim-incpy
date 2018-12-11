@@ -20,8 +20,8 @@
 " be displayed in 'python-output'
 "
 " ! -- execute current selected row
-" Ctrl+@ -- display repr for symbol under character
-" Ctrl+_ -- display help for symbol under character
+" Ctrl+\ -- display repr for symbol under character using g:incpy#EvalFormat
+" Ctrl+_ -- display help for symbol under character using g:incpy#HelpFormat
 "
 " Installation:
 " If in posix, copy to ~/.vim/plugin/
@@ -39,13 +39,13 @@
 " Configuration (via globals):
 " string g:incpy#Program      -- name of subprogram (if empty, use vim's internal python)
 " int    g:incpy#Greenlets    -- whether to use greenlets (lightweight-threads) or not.
-" int    g:incpy#OutputFollow -- go to the end of output when input is sent
-" string g:incpy#InputFormat  -- when executing a command, what to terminate it with
-" int    g:incpy#InputStrip   -- whether to strip leading indent
+" int    g:incpy#OutputFollow -- go to the end of output buffer when any input has been sent
+" string g:incpy#InputFormat  -- the formatspec to use when executing code
+" int    g:incpy#InputStrip   -- whether to strip any leading indentation from input
 " int    g:incpy#Echo         -- whether the plugin should echo all input to the program
-" string g:incpy#EchoFormat   -- the formatspec to execute each line with
-" string g:incpy#HelpFormat   -- the formatspec to execute help with
-" string g:incpy#EvalFormat   -- the formatspec to evaluate a single expression with
+" string g:incpy#EchoFormat   -- the formatspec to execute lines with
+" string g:incpy#HelpFormat   -- the formatspec to use for getting help on an expression
+" string g:incpy#EvalFormat   -- the formatspec to evaluate and emit an expression with
 "
 " string g:incpy#WindowName     -- the name of the output buffer that gets created.
 " int    g:incpy#WindowFixed    -- don't allow automatic resizing of the window
@@ -59,17 +59,17 @@
 "       if some of the Program output is parsed, it might be possible to
 "           create a fold labelled by the first rw python code that
 "           exec'd it
-"       maybe exeecution of the contents of a register would be useful
-"       verify everything is cool in the linux-world
+"       maybe execution of the contents of a register would be useful
+"       allow the user to specify which buffer to write program's output to:qa
 
 if has("python")
 
-" vim string manipulation for indents and things
+""" Utility functions for indentation stuff
 function! s:count_indent(string)
-    " count the beginning whitespace of a string
+    " count the whitespace that prefixes a single-line string
     let characters = 0
-    for c in split(a:string,'\zs')
-        if stridx(" \t",c) == -1
+    for c in split(a:string, '\zs')
+        if stridx(" \t", c) == -1
             break
         endif
         let characters += 1
@@ -78,7 +78,7 @@ function! s:count_indent(string)
 endfunction
 
 function! s:find_common_indent(lines)
-    " find the smallest indent
+    " find the smallest common indent of a list of strings
     let smallestindent = -1
     for l in a:lines
         " skip lines that are all whitespace
@@ -94,34 +94,32 @@ function! s:find_common_indent(lines)
     return smallestindent
 endfunction
 
-function! s:strip_indentation(lines)
-    let indentsize = s:find_common_indent(a:lines)
+function! s:strip_common_indent(lines, size)
+    " strip the specified number of characters from a list of lines
 
-    " remove the indent
     let results = []
     let prevlength = 0
+
+    " iterate through each line
     for l in a:lines
+
+        " if the line is empty, then pad it with the previous indent
         if strlen(l) == 0
-            let row = repeat(" ",prevlength)
+            let row = repeat(" ", prevlength)
+
+        " otherwise remove the requested size, and count the leftover indent
         else
-            let row = strpart(l,indentsize)
+            let row = strpart(l, a:size)
             let prevlength = s:count_indent(row)
         endif
+
+        " append our row to the list of results
         let results += [row]
     endfor
     return results
 endfunction
 
-function! s:selected() range
-    " really, vim? really??
-    let oldvalue = getreg("")
-    normal gvy
-    let result = getreg("")
-    call setreg("", oldvalue)
-    return result
-endfunction
-
-"" private window management
+""" Window management
 function! s:windowselect(id)
     " select the requested windowid, return the previous window id
     let current = winnr()
@@ -130,7 +128,7 @@ function! s:windowselect(id)
 endfunction
 
 function! s:windowtail(bufid)
-    " tail the window with the requested bufid
+    " tail the window that's using the specified buffer id
     let last = s:windowselect(bufwinnr(a:bufid))
     if winnr() == bufwinnr(a:bufid)
         keepjumps noautocmd normal gg
@@ -155,6 +153,16 @@ function! s:windowtail(bufid)
     endif
 endfunction
 
+""" Miscellanous utilities
+function! s:selected() range
+    " really, vim? really??
+    let oldvalue = getreg("")
+    normal gvy
+    let result = getreg("")
+    call setreg("", oldvalue)
+    return result
+endfunction
+
 function! s:singleline(string, escape)
     " escape the multiline string with the specified characters and return it as a single-line string
     let escaped = escape(a:string, a:escape)
@@ -162,110 +170,9 @@ function! s:singleline(string, escape)
     return result
 endfunction
 
-function! incpy#Start()
-    python __incpy__.cache.start()
-endfunction
-
-function! incpy#Stop()
-    python __incpy__.cache.stop()
-endfunction
-
-function! incpy#Restart()
-    python __incpy__.cache.stop()
-    python __incpy__.cache.start()
-endfunction
-
-" incpy methods
-function! incpy#SetupPython(currentscriptpath)
-    let m = substitute(a:currentscriptpath, "\\", "/", "g")
-
-    " FIXME: use sys.meta_path
-
-    " setup the default logger
-    python __import__('logging').basicConfig()
-    python __import__('logging').getLogger('incpy')
-
-    " add the python path using the runtimepath directory that this script is contained in
-    for p in split(&runtimepath,",")
-        let p = substitute(p, "\\", "/", "g")
-        if stridx(m, p, 0) == 0
-            execute printf("python __import__('sys').path.append('%s/python')", p)
-            return
-        endif
-    endfor
-
-    " otherwise, look up from our current script's directory for a python sub-directory
-    let p = finddir("python", m . ";")
-    if isdirectory(p)
-        execute printf("python __import__('sys').path.append('%s')", p)
-        return
-    endif
-
-    throw printf("Unable to determine basepath from script %s", m)
-endfunction
-
-""" external interfaces
-function! incpy#Execute(line)
-    execute printf("python __incpy__.cache.communicate('%s')", escape(a:line, "'\\"))
-    if g:incpy#OutputFollow
-        call s:windowtail(g:incpy#BufferId)
-    endif
-endfunction
-function! incpy#Range(begin,end)
-    let lines = getline(a:begin,a:end)
-    if g:incpy#InputStrip
-        let lines = s:strip_indentation(lines)
-    endif
-
-    let code_s = join(map(lines, 'escape(v:val, "''\\")'), "\\n")
-    execute printf("python __incpy__.cache.communicate('%s')", code_s)
-    if g:incpy#OutputFollow
-        call s:windowtail(g:incpy#BufferId)
-    endif
-endfunction
-function! incpy#Evaluate(expr)
-    execute printf("python __incpy__.cache.communicate(\"%s\".format(\"%s\"))", s:singleline(g:incpy#EvalFormat, "\"\\"), escape(a:expr, "\"\\"))
-    if g:incpy#OutputFollow
-        call s:windowtail(g:incpy#BufferId)
-    endif
-endfunction
-function! incpy#Halp(expr)
-    " Remove all encompassing whitespace from expression
-    let LetMeSeeYouStripped = substitute(a:expr, '^[ \t\n]\+\|[ \t\n]\+$', '', 'g')
-
-    " Pass g:incpy#HelpFormat to incpy's communicator
-    execute printf("python __incpy__.cache.communicate(\"%s\".format(\"%s\"))", s:singleline(g:incpy#HelpFormat, "\"\\"), escape(LetMeSeeYouStripped, "\"\\"))
-endfunction
-
-" Create vim commands
-function! incpy#MapCommands()
-    command PyLine call incpy#Range(line("."),line("."))
-    command PyBuffer call incpy#Range(0,line('$'))
-
-    command -nargs=1 Py call incpy#Execute(<q-args>)
-    command -range PyRange call incpy#Range(<line1>,<line2>)
-
-    " python-specific commands
-    command -nargs=1 PyEval call incpy#Evaluate(<q-args>)
-    command -range PyEvalRange <line1>,<line2>call incpy#Evaluate(s:selected())
-    command -nargs=1 PyHelp call incpy#Halp(<q-args>)
-    command -range PyHelpRange <line1>,<line2>call incpy#Halp(s:selected())
-endfunction
-
-" Setup key mappings
-function! incpy#MapKeys()
-    nmap ! :PyLine<C-M>
-    vmap ! :PyRange<C-M>
-
-    " python-specific mappings
-    nmap <C-\> :call incpy#Evaluate(expand("<cword>"))<C-M>
-    vmap <C-\> :PyEvalRange<C-M>
-    nmap  :call incpy#Halp(expand("<cword>"))<C-M>
-    vmap <C-_> :PyHelpRange<C-M>
-endfunction
-
-" Setup default options
+""" Interface for setting up the plugin
 function! incpy#SetupOptions()
+    " Set any default options for the plugin that the user missed
     let defopts = {}
     let defopts["Program"] = ""
     let defopts["Greenlets"] = 0
@@ -285,6 +192,7 @@ function! incpy#SetupOptions()
     " let defopts["EvalFormat"] = printf("__incpy__.builtin._={};print __incpy__.__builtin__._")
     let defopts["EvalFormat"] = printf("%s._={};print %s.repr(%s._)", python_builtins, python_builtins, python_builtins)
 
+    " If any of these options aren't defined during evaluation, then go through and assign them as defaults
     for o in keys(defopts)
         if ! exists("g:incpy#{o}")
             let g:incpy#{o} = defopts[o]
@@ -292,8 +200,65 @@ function! incpy#SetupOptions()
     endfor
 endfunction
 
-" Setup python interface
+function! incpy#SetupPython(currentscriptpath)
+    " Set up the module search path to include the script's "python" directory
+    let m = substitute(a:currentscriptpath, "\\", "/", "g")
+
+    " FIXME: use sys.meta_path
+
+    " setup the default logger
+    python __import__('logging').basicConfig()
+    python __import__('logging').getLogger('incpy')
+
+    " add the python path using the runtimepath directory that this script is contained in
+    for p in split(&runtimepath, ",")
+        let p = substitute(p, "\\", "/", "g")
+        if stridx(m, p, 0) == 0
+            execute printf("python __import__('sys').path.append('%s/python')", p)
+            return
+        endif
+    endfor
+
+    " otherwise, look up from our current script's directory for a python sub-directory
+    let p = finddir("python", m . ";")
+    if isdirectory(p)
+        execute printf("python __import__('sys').path.append('%s')", p)
+        return
+    endif
+
+    throw printf("Unable to determine basepath from script %s", m)
+endfunction
+
+""" Mapping of vim commands and keys
+function! incpy#SetupCommands()
+    " Create some vim commands that interact with the plugin
+    command PyLine call incpy#Range(line("."), line("."))
+    command PyBuffer call incpy#Range(0, line('$'))
+
+    command -nargs=1 Py call incpy#Execute(<q-args>)
+    command -range PyRange call incpy#Range(<line1>, <line2>)
+
+    command -nargs=1 PyEval call incpy#Evaluate(<q-args>)
+    command -range PyEvalRange <line1>,<line2>call incpy#Evaluate(s:selected())
+    command -nargs=1 PyHelp call incpy#Halp(<q-args>)
+    command -range PyHelpRange <line1>,<line2>call incpy#Halp(s:selected())
+endfunction
+
+function! incpy#SetupKeys()
+    " Set up the default key mappings for vim to use the plugin
+    nmap ! :PyLine<C-M>
+    vmap ! :PyRange<C-M>
+
+    " python-specific mappings
+    nmap <C-\> :call incpy#Evaluate(expand("<cword>"))<C-M>
+    vmap <C-\> :PyEvalRange<C-M>
+    nmap <C-_> :call incpy#Halp(expand("<cword>"))<C-M>
+    vmap <C-_> :PyHelpRange<C-M>
+endfunction
+
+"" Define the whole python interface for the plugin
 function! incpy#Setup()
+
     " Set any the options for the python module part.
     if g:incpy#Greenlets > 0
         " If greenlets were specified, then enable it by importing 'gevent' into the current python environment
@@ -303,7 +268,7 @@ function! incpy#Setup()
         echohl WarningMsg | echomsg "WARNING:incpy.vim:Using vim-incpy to run an external program without support for greenlets will be unstable" | echohl None
     endif
 
-    " Initialize python __incpy__ namespace
+    " Initialize the python __incpy__ namespace
     python <<EOF
 
 # create a pseudo-builtin module
@@ -695,17 +660,81 @@ del(_)
 EOF
 endfunction
 
+""" Plugin management interface
+function! incpy#Start()
+    " Start the target program and attach it to a buffer
+    python __incpy__.cache.start()
+endfunction
+
+function! incpy#Stop()
+    " Stop the target program and detach it from its buffer
+    python __incpy__.cache.stop()
+endfunction
+
+function! incpy#Restart()
+    " Restart the target program
+    python __incpy__.cache.stop()
+    python __incpy__.cache.start()
+endfunction
+
+""" Plugin interaction interface
+function! incpy#Execute(line)
+    execute printf("python __incpy__.cache.communicate('%s')", escape(a:line, "'\\"))
+    if g:incpy#OutputFollow
+        call s:windowtail(g:incpy#BufferId)
+    endif
+endfunction
+
+function! incpy#Range(begin, end)
+    " Execute the specified lines in the target
+    let lines = getline(a:begin, a:end)
+
+    " Strip the fetched lines if the user configured us to
+    if g:incpy#InputStrip
+        let indentsize = s:find_common_indent(lines)
+        let lines = s:strip_common_indent(lines, indentsize)
+    endif
+
+    " Execute the lines in our target
+    let code_s = join(map(lines, 'escape(v:val, "''\\")'), "\\n")
+    execute printf("python __incpy__.cache.communicate('%s')", code_s)
+
+    " If the user configured us to follow the output, then do as we were told.
+    if g:incpy#OutputFollow
+        call s:windowtail(g:incpy#BufferId)
+    endif
+endfunction
+
+function! incpy#Evaluate(expr)
+    " Evaluate and emit an expression in the target using the plugin
+    execute printf("python __incpy__.cache.communicate(\"%s\".format(\"%s\"))", s:singleline(g:incpy#EvalFormat, "\"\\"), escape(a:expr, "\"\\"))
+
+    if g:incpy#OutputFollow
+        call s:windowtail(g:incpy#BufferId)
+    endif
+endfunction
+
+function! incpy#Halp(expr)
+    " Remove all encompassing whitespace from expression
+    let LetMeSeeYouStripped = substitute(a:expr, '^[ \t\n]\+\|[ \t\n]\+$', '', 'g')
+
+    " Execute g:incpy#HelpFormat in the target using the plugin's cached communicator
+    execute printf("python __incpy__.cache.communicate(\"%s\".format(\"%s\"))", s:singleline(g:incpy#HelpFormat, "\"\\"), escape(LetMeSeeYouStripped, "\"\\"))
+endfunction
+
+""" Actual execution and setup of the plugin
     let s:current_script=expand("<sfile>:p:h")
     call incpy#SetupOptions()
     call incpy#SetupPython(s:current_script)
     call incpy#Setup()
-    call incpy#MapCommands()
-    call incpy#MapKeys()
+    call incpy#SetupCommands()
+    call incpy#SetupKeys()
 
     " on entry, silently import the user module to honor any user-specific configurations
-    autocmd VimEnter * python hasattr(__incpy__,'cache') and __incpy__.cache.attach()
-    autocmd VimLeavePre * python hasattr(__incpy__,'cache') and __incpy__.cache.detach()
+    autocmd VimEnter * python hasattr(__incpy__, 'cache') and __incpy__.cache.attach()
+    autocmd VimLeavePre * python hasattr(__incpy__, 'cache') and __incpy__.cache.detach()
 
+    " if greenlets were specifed then make sure to update them during cursor movement
     if g:incpy#Greenlets > 0
         autocmd CursorHold * python __import__('gevent').idle(0.0)
         autocmd CursorHoldI * python __import__('gevent').idle(0.0)
@@ -714,5 +743,5 @@ endfunction
     endif
 
 else
-    echoerr "Vim compiled without python support. Unable to initialize plugin from ". expand("<sfile>")
+    echoerr "Vim compiled without +python support. Unable to initialize plugin from ". expand("<sfile>")
 endif
