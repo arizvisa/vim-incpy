@@ -383,15 +383,17 @@ class interpreter_external(__incpy__.interpreter):
         __incpy__.logger.debug("connecting i/o from {!r} to {!r}".format(self.command, self.view))
         self.instance = __incpy__.spawn(self.view.write, self.command, **self.options)
         __incpy__.logger.info("started process {:d} ({:#x}): {:s}".format(self.instance.id,self.instance.id,self.command))
+        self.state = __incpy__.logger,
     def detach(self):
         if not self.instance:
             return
+        logger, = self.state
         if not self.instance.running:
-            __incpy__.logger.fatal("refusing to stop already terminated process {!r}".format(self.instance))
+            logger.fatal("refusing to stop already terminated process {!r}".format(self.instance))
             return
-        __incpy__.logger.info("killing process {!r}".format(self.instance))
+        logger.info("killing process {!r}".format(self.instance))
         self.instance.stop()
-        __incpy__.logger.debug("disconnecting i/o for {!r} from {!r}".format(self.instance,self.view))
+        logger.debug("disconnecting i/o for {!r} from {!r}".format(self.instance,self.view))
         self.instance = None
 
     def communicate(self, data, silent=False):
