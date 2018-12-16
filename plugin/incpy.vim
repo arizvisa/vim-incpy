@@ -191,6 +191,8 @@ function! incpy#SetupOptions()
     " let defopts["EvalFormat"] = printf("__incpy__.sys.displayhook({})')")
     " let defopts["EvalFormat"] = printf("__incpy__.builtin._={};print __incpy__.__builtin__._")
     let defopts["EvalFormat"] = printf("%s._={};print %s.repr(%s._)", python_builtins, python_builtins, python_builtins)
+    let defopts["InputFormat"] = "{}\n"
+    let defopts["EchoFormat"] = "# >>> {}"
 
     " If any of these options aren't defined during evaluation, then go through and assign them as defaults
     for o in keys(defopts)
@@ -354,9 +356,9 @@ class interpreter_python_internal(__incpy__.interpreter):
 
         sys.stdin,sys.stdout,sys.stderr,_ = self.state
     def communicate(self, data, silent=False):
-        inputformat = __incpy__.vim.gvars.get('incpy#InputFormat', '{}\n')
+        inputformat = __incpy__.vim.gvars['incpy#InputFormat']
         if __incpy__.vim.gvars['incpy#Echo'] and not silent:
-            echoformat = __incpy__.vim.gvars.get('incpy#EchoFormat', "# >>> {}")
+            echoformat = __incpy__.vim.gvars['incpy#EchoFormat']
             echo = '\n'.join(map(echoformat.format, data.split('\n')))
             echo = inputformat.format(echo)
             self.view.write(echo)
@@ -393,9 +395,9 @@ class interpreter_external(__incpy__.interpreter):
         self.instance = None
 
     def communicate(self, data, silent=False):
-        inputformat = __incpy__.vim.gvars.get('incpy#InputFormat', '{}\n')
+        inputformat = __incpy__.vim.gvars['incpy#InputFormat']
         if __incpy__.vim.gvars['incpy#Echo'] and not silent:
-            echoformat = __incpy__.vim.gvars.get('incpy#EchoFormat', "{}")
+            echoformat = __incpy__.vim.gvars['incpy#EchoFormat']
             echo = echoformat.format(data)
             echo = inputformat.format(data)
             self.view.write(echo)
