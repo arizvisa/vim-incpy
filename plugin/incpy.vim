@@ -190,7 +190,8 @@ function! incpy#SetupOptions()
     " let defopts["EvalFormat"] = printf("_={};print _')", python_builtins, python_builtins, python_builtins)
     " let defopts["EvalFormat"] = printf("__incpy__.sys.displayhook({})')")
     " let defopts["EvalFormat"] = printf("__incpy__.builtin._={};print __incpy__.__builtin__._")
-    let defopts["EvalFormat"] = printf("%s._={};print %s.repr(%s._)", python_builtins, python_builtins, python_builtins)
+    let python_sys = "__import__(\"sys\")"
+    let defopts["EvalFormat"] = printf("%s.displayhook({})", python_sys)
     let defopts["InputFormat"] = "{}\n"
     let defopts["EchoFormat"] = "# >>> {}"
 
