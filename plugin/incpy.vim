@@ -33,8 +33,8 @@
 "
 " Mappings:
 " ! -- execute current selected row
-" Ctrl+@ -- display `repr()` for symbol at cursor using `g:incpy#EvalFormat`.
-" Ctrl+\ -- display `help()` for symbol at cursor using `g:incpy#HelpFormat`.
+" <C-\> -- display `repr()` for symbol at cursor using `g:incpy#EvalFormat`.
+" <C-@> -- display `help()` for symbol at cursor using `g:incpy#HelpFormat`.
 "
 " Installation:
 " Simply copy the root of this repository into your user's runtime directory.
@@ -286,10 +286,10 @@ function! incpy#SetupKeys()
     vnoremap ! :PyRange<C-M>
 
     " python-specific mappings
-    nnoremap <C-@> :call incpy#Evaluate(expand("<cword>"))<C-M>
-    vnoremap <C-@> :PyEvalRange<C-M>
-    nnoremap <C-\> :call incpy#Halp(expand("<cword>"))<C-M>
-    vnoremap <C-\> :PyHelpRange<C-M>
+    nnoremap <C-\> :call incpy#Evaluate(expand("<cword>"))<C-M>
+    vnoremap <C-\> :PyEvalRange<C-M>
+    nnoremap <C-@> :call incpy#Halp(expand("<cword>"))<C-M>
+    vnoremap <C-@> :PyHelpRange<C-M>
 endfunction
 
 "" Define the whole python interface for the plugin
