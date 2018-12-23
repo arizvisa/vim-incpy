@@ -20,8 +20,8 @@
 " be displayed in 'python-output'
 "
 " ! -- execute current selected row
-" Ctrl+\ -- display repr for symbol under character using g:incpy#EvalFormat
-" Ctrl+_ -- display help for symbol under character using g:incpy#HelpFormat
+" Ctrl+@ -- display repr for symbol under character using g:incpy#EvalFormat
+" Ctrl+\ -- display help for symbol under character using g:incpy#HelpFormat
 "
 " Installation:
 " If in posix, copy to ~/.vim/plugin/
@@ -253,10 +253,10 @@ function! incpy#SetupKeys()
     vmap ! :PyRange<C-M>
 
     " python-specific mappings
-    nmap <C-\> :call incpy#Evaluate(expand("<cword>"))<C-M>
-    vmap <C-\> :PyEvalRange<C-M>
-    nmap <C-_> :call incpy#Halp(expand("<cword>"))<C-M>
-    vmap <C-_> :PyHelpRange<C-M>
+    nmap <C-@> :call incpy#Evaluate(expand("<cword>"))<C-M>
+    vmap <C-@> :PyEvalRange<C-M>
+    nmap <C-\> :call incpy#Halp(expand("<cword>"))<C-M>
+    vmap <C-\> :PyHelpRange<C-M>
 endfunction
 
 "" Define the whole python interface for the plugin
