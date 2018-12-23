@@ -282,14 +282,14 @@ endfunction
 
 function! incpy#SetupKeys()
     " Set up the default key mappings for vim to use the plugin
-    nmap ! :PyLine<C-M>
-    vmap ! :PyRange<C-M>
+    nnoremap ! :PyLine<C-M>
+    vnoremap ! :PyRange<C-M>
 
     " python-specific mappings
-    nmap <C-@> :call incpy#Evaluate(expand("<cword>"))<C-M>
-    vmap <C-@> :PyEvalRange<C-M>
-    nmap <C-\> :call incpy#Halp(expand("<cword>"))<C-M>
-    vmap <C-\> :PyHelpRange<C-M>
+    nnoremap <C-@> :call incpy#Evaluate(expand("<cword>"))<C-M>
+    vnoremap <C-@> :PyEvalRange<C-M>
+    nnoremap <C-\> :call incpy#Halp(expand("<cword>"))<C-M>
+    vnoremap <C-\> :PyHelpRange<C-M>
 endfunction
 
 "" Define the whole python interface for the plugin
