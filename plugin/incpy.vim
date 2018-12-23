@@ -1,34 +1,56 @@
-" based on an idea that bniemczyk@gmail.com had
-" thanks to ccliver@gmail.org for his input
-" thanks to Tim Pope <vimNOSPAM@tpope.info> for pointing out preview windows
+" Based on an idea that bniemczyk@gmail.com had during some conversation.
+" Thanks to ccliver@gmail.org for his input on this.
+" Thanks to Tim Pope <vimNOSPAM@tpope.info> for pointing out preview windows.
 "
-" requires vim to be compiled w/ python support. I noticed that most of my
-" python development consisted of copying code into the python interpreter
-" FIXME: i deleted this line during some time
-" required by copy&paste, I decided to make vim more friendly for that style
-" of development. this is the result. I apologize for the hackiness.
+" This plugin requires vim to be compiled w/ python support. It came into
+" existance when I noticed that most of my earlier Python development
+" consisted of copying code into the python interpreter in order to check
+" my results or to test out some code.
 "
-" when a .py file is opened (determined by filetype), a buffer is created
+" After developing this insight, I decided to make vim more friendly for
+" that style of development by writing an interface around interaction
+" with Vim's embedded instance of python. Pretty soon I recognized that
+" it'd be nice if all my programs could write their output into a buffer
+" and so I worked on refactoring all of the code so that it would capture
+" stdout and stderr from an external program and update a buffer.
 "
-" python-output
-" this contains the output of all the code you've executed.
-" by default this is shown in a splitscreened window
+" This is the result of these endeavors. I apologize in the advance for the
+" hackiness as this plugin was initially written when I was first learning
+" Python.
+"
+" When a .py file is opened (determined by filetype), a buffer is created.
+" Any output from the target program is then written into this buffer.
+"
+" This buffer has the default name of "Scratch" which will contain the
+" output of all of the code that you've executed using this plugin. By
+" default, this buffer is shown in a split-screened window.
 "
 " Usage:
-" Move the cursor to a line or hilight some text (visual mode)
-" and hit '!' to execute in the python interpreter. it's output will
-" be displayed in 'python-output'
+" Move the cursor to a line or highlight some text in visual mode.
+" Once you hit "!", the selected text or line will then be fed into into
+" the target application's stdin. Any output that the target program
+" emits will then be updated in the "Scratch" buffer.
 "
+" Mappings:
 " ! -- execute current selected row
-" Ctrl+@ -- display repr for symbol under character using g:incpy#EvalFormat
-" Ctrl+\ -- display help for symbol under character using g:incpy#HelpFormat
+" Ctrl+@ -- display `repr()` for symbol at cursor using `g:incpy#EvalFormat`.
+" Ctrl+\ -- display `help()` for symbol at cursor using `g:incpy#HelpFormat`.
 "
 " Installation:
-" If in posix, copy to ~/.vim/plugin/
-" If in windows, copy to $USERPROFILE/vimfiles/plugin/
+" Simply copy the root of this repository into your user's runtime directory.
+" If in a posixy environment, this is at "$HOME/.vim".
+" If in windows, this is at "$USERPROFILE/vimfiles".
 "
-" basic knowledge of window management is required to use effectively. here's
-" a quickref:
+" This repository contains two directories, one of which is "plugin" and the
+" second of which is "python". The "plugin" directory contains this file and
+" will determine the runtime directory that it was installed in. This will
+" then locate the "python" directory which contains the python code that this
+" plugin depends on.
+"
+" Window Management:
+" Proper usage of this plugin requires basic knowledge of window management
+" in order to use it effectively. Some mappings that can be used to manage
+" windows in vim are as follows.
 "
 "   <C-w>s -- horizontal split
 "   <C-w>v -- vertical split
@@ -36,31 +58,42 @@
 "   <C-w>q -- close current window
 "   <C-w>{h,l,j,k} -- move to the window left,right,down,up from current one
 "
-" Configuration (via globals):
-" string g:incpy#Program      -- name of subprogram (if empty, use vim's internal python)
-" int    g:incpy#Greenlets    -- whether to use greenlets (lightweight-threads) or not.
-" int    g:incpy#OutputFollow -- go to the end of output buffer when any input has been sent
-" string g:incpy#InputFormat  -- the formatspec to use when executing code
-" int    g:incpy#InputStrip   -- whether to strip any leading indentation from input
-" int    g:incpy#Echo         -- whether the plugin should echo all input to the program
-" string g:incpy#EchoFormat   -- the formatspec to execute lines with
-" string g:incpy#HelpFormat   -- the formatspec to use for getting help on an expression
-" string g:incpy#EvalFormat   -- the formatspec to evaluate and emit an expression with
+" Configuration:
+" To configure this plugin, one can simply set some globals in their ".vimrc"
+" file. The available options are as follows.
 "
-" string g:incpy#WindowName     -- the name of the output buffer that gets created.
-" int    g:incpy#WindowFixed    -- don't allow automatic resizing of the window
-" dict   g:incpy#WindowOptions  -- new window options
-" int    g:incpy#WindowPreview  -- use preview windows
-" string g:incpy#WindowPosition -- window position.  ['above', 'below', 'left', 'right']
-" float  g:incpy#WindowRatio    -- window size on creation
+" string g:incpy#Program      -- name of subprogram (if empty, use vim's internal python).
+" int    g:incpy#Greenlets    -- whether to use greenlets (lightweight-threads) or not.
+" int    g:incpy#OutputFollow -- flag that specifies to tail the output of the subprogram.
+" string g:incpy#InputFormat  -- the formatspec to use when executing code in the target.
+" int    g:incpy#InputStrip   -- when executing input, specify whether to strip leading indentation.
+" int    g:incpy#Echo         -- when executing input, echo it to the "Scratch" buffer.
+" string g:incpy#EchoFormat   -- the formatspec to format code to execute with.
+" string g:incpy#HelpFormat   -- the formatspec to use when getting help on an expression.
+" string g:incpy#EvalFormat   -- the formatspec to evaluate and emit an expression with.
+"
+" string g:incpy#WindowName     -- the name of the output buffer. defaults to "Scratch".
+" int    g:incpy#WindowFixed    -- refuse to allow automatic resizing of the window.
+" dict   g:incpy#WindowOptions  -- the options to use when creating the output window.
+" int    g:incpy#WindowPreview  -- whether to use preview windows for the program output.
+" float  g:incpy#WindowRatio    -- the ratio of the window size when creating it
+" string g:incpy#WindowPosition -- the position at which to create the window. can be
+"                                  either "above", "below", "left", or "right".
 "
 " Todo:
-"       the auto-popup of the buffer based on the filetype was pretty cool
-"       if some of the Program output is parsed, it might be possible to
-"           create a fold labelled by the first rw python code that
-"           exec'd it
-"       maybe execution of the contents of a register would be useful
-"       allow the user to specify which buffer to write program's output to:qa
+" - When the filetype of the current buffer was specified, the target output buffer
+"   used to pop-up. This used to be pretty cool, but was deprecated. It'd be neat
+"   to bring this back somehow.
+" - When outputting the result of something that was executed, it might be possible
+"   to create a fold (`zf`). This would also be pretty cool so that users can hide
+"   something that they were just testing.
+" - It might be change the way some of the wrappers around the interface works so
+"   that a user can attach a program to a particular buffer from their ".vimrc"
+"   instead of starting up with a default one immediately attached. This way
+"   mappings can be customized as well.
+" - If would be pretty cool if an output buffer could be attached to an editing
+"   buffer so that management of multiple program buffers would be local to
+"   whatever the user is currently editing.
 
 if has("python")
 
