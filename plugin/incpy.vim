@@ -499,14 +499,14 @@ class internal(object):
                 return 'leftabove'
             if position in ('right','below'):
                 return 'rightbelow'
-            raise __incpy__.builtin.ValueError, position
+            raise __incpy__.builtin.ValueError(position)
         @__incpy__.builtin.staticmethod
         def positionToSplit(position):
             if position in ('left','right'):
                 return 'vsplit'
             if position in ('above','below'):
                 return 'split'
-            raise __incpy__.builtin.ValueError, position
+            raise __incpy__.builtin.ValueError(position)
         @__incpy__.builtin.staticmethod
         def optionsToCommandLine(options):
             builtin = __incpy__.builtin
@@ -537,7 +537,7 @@ class internal(object):
                 return builtin.int(__incpy__.vim.eval('winwidth(0)'))
             if position in ('above','below'):
                 return builtin.int(__incpy__.vim.eval('winheight(0)'))
-            raise builtin.ValueError, position
+            raise builtin.ValueError(position)
 
         # properties
         @__incpy__.builtin.staticmethod
@@ -640,7 +640,7 @@ class view(object):
         elif builtin.isinstance(target, six.string_types):
             try: return __incpy__.buffer.from_name(target)
             except: return __incpy__.buffer.new(target)
-        raise __incpy__.incpy.error, "Unable to determine output buffer from parameter : {!r}".format(target)
+        raise __incpy__.incpy.error("Unable to determine output buffer from parameter : {!r}".format(target))
 
     def write(self, data):
         """Write data directly into window contents (updating buffer)"""
@@ -651,13 +651,13 @@ class view(object):
         builtin = __incpy__.builtin
         buf = self.buffer
         if __incpy__.internal.buffer.number(buf.number) == -1:
-            raise builtin.Exception, "Buffer {:d} does not exist".format(buf.number)
+            raise builtin.Exception("Buffer {:d} does not exist".format(buf.number))
         if 1.0 <= ratio < 0.0:
-            raise builtin.Exception, "Specified ratio is out of bounds {!r}".format(ratio)
+            raise builtin.Exception("Specified ratio is out of bounds {!r}".format(ratio))
 
         current = __incpy__.internal.window.current()
         sz = __incpy__.internal.window.currentsize(position) * ratio
-        result = __incpy__.internal.window.create(buf.number, position, int(sz), self.options, preview=self.preview)
+        result = __incpy__.internal.window.create(buf.number, position, __incpy__.builtin.int(sz), self.options, preview=self.preview)
         self.window = result
         return result
 
@@ -666,9 +666,9 @@ class view(object):
         builtin = __incpy__.builtin
         buf = self.buffer
         if __incpy__.internal.buffer.number(buf.number) == -1:
-            raise builtin.Exception, "Buffer {:d} does not exist".format(buf.number)
+            raise builtin.Exception("Buffer {:d} does not exist".format(buf.number))
         if __incpy__.internal.buffer.window(buf.number) != -1:
-            raise builtin.Exception, "Window for {:d} is already showing".format(buf.number)
+            raise builtin.Exception("Window for {:d} is already showing".format(buf.number))
         __incpy__.internal.window.show(buf.number, position, preview=self.preview)
 
     def hide(self):
@@ -676,9 +676,9 @@ class view(object):
         builtin = __incpy__.builtin
         buf = self.buffer
         if __incpy__.internal.buffer.number(buf.number) == -1:
-            raise builtin.Exception, "Buffer {:d} does not exist".format(buf.number)
+            raise builtin.Exception("Buffer {:d} does not exist".format(buf.number))
         if __incpy__.internal.buffer.window(buf.number) == -1:
-            raise builtin.Exception, "Window for {:d} is already hidden".format(buf.number)
+            raise builtin.Exception("Window for {:d} is already hidden".format(buf.number))
         __incpy__.internal.window.hide(buf.number, preview=self.preview)
 
     def __repr__(self):
