@@ -38,7 +38,7 @@ try:
                 return "[{:s}]".format(','.join(map(cls._to,n)))
             if type(n) is dict:
                 return "{{{:s}}}".format(','.join((':'.join((cls._to(k),cls._to(v))) for k,v in n.iteritems())))
-            raise Exception, "Unknown type {:s} : {!r}".format(type(n),n)
+            raise Exception("Unknown type {:s} : {!r}".format(type(n),n))
 
         @classmethod
         def _from(cls, n):
