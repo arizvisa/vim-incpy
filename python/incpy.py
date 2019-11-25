@@ -352,8 +352,8 @@ class process(object):
     id = property(fget=lambda self: self.program and self.program.pid or -1)
     running = property(fget=lambda self: False if self.program is None else self.program.poll() is None)
     working = property(fget=lambda self: self.running and not self.eventWorking.is_set())
-    threads = property(fget=lambda self: list(self.__threads))
-    updater = property(fget=lambda self: self.__updater)
+    threads = property(fget=lambda self: list(self.__threads__))
+    updater = property(fget=lambda self: self.__updater__)
 
     taskQueue = property(fget=lambda self: self.__taskQueue)
     exceptionQueue = property(fget=lambda self: self.__exceptionQueue)
@@ -371,8 +371,8 @@ class process(object):
         timeout<float> = -1 -- if positive, then raise a Asynchronous.Empty exception at the specified interval.
         """
         ## default properties
-        self.__updater = None
-        self.__threads = weakref.WeakSet()
+        self.__updater__ = None
+        self.__threads__ = weakref.WeakSet()
         self.__kwds = kwds
 
         args = shlex.split(command) if isinstance(command, six.string_types) else command[:]
@@ -462,7 +462,7 @@ class process(object):
             return
 
         ## actually create and start our update threads
-        self.__updater = updater = Asynchronous.Thread(target=update, name="thread-{:x}.update".format(self.id), args=(self, timeout))
+        self.__updater__ = updater = Asynchronous.Thread(target=update, name="thread-{:x}.update".format(self.id), args=(self, timeout))
         updater.daemon = daemon
         updater.start()
         return updater
@@ -483,7 +483,7 @@ class process(object):
         threads, senders = zip(*res)
 
         ## update our set of threads for destruction later
-        self.__threads.update(threads)
+        self.__threads__.update(threads)
 
         ## set everything off
         for t in threads: t.start()
@@ -690,7 +690,7 @@ class process(object):
         # now spin until none of them are alive
         while len(self.threads) > 0:
             for th in self.threads[:]:
-                if not th.is_alive(): self.__threads.discard(th)
+                if not th.is_alive(): self.__threads__.discard(th)
                 del(th)
             continue
 
@@ -699,7 +699,7 @@ class process(object):
         self.updater.join()
         if self.updater.is_alive():
             raise AssertionError
-        self.__updater = None
+        self.__updater__ = None
         return
 
     def __repr__(self):
