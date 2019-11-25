@@ -432,8 +432,10 @@ class process(object):
         except OSError: raise OSError("Unable to execute command: {!r}".format(command))
 
     @staticmethod
-    def monitorPipe(q, (id, pipe), *more, **options):
-        """Attach a coroutine to a monitoring thread for stuffing queue `q` with data read from `pipe`
+    def monitorPipe(q, target, *more, **options):
+        """Attach a coroutine to a monitoring thread for stuffing queue `q` with data read from `target`.
+
+        The tuple `target` is composed of two values, `id` and `pipe`.
 
         Yields a list of (thread, coro) tuples given the arguments provided.
         Each thread will read from `pipe`, and stuff the value combined with `id` into `q`.
@@ -441,7 +443,7 @@ class process(object):
         def stuff(q, *key):
             while True: q.put(key + ((yield),))
 
-        for id, pipe in itertools.chain([(id, pipe)], more):
+        for id, pipe in itertools.chain([target], more):
             res, name = stuff(q, id), "{:s}<{!r}>".format(options.get('name', ''), id)
             yield process.monitor(res.next() or res.send, pipe, name=name), res
         return
