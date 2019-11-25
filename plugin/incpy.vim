@@ -218,7 +218,7 @@ function! incpy#SetupOptions()
     let defopts["WindowOptions"] = {"buftype":"nowrite", "noswapfile":[], "updatecount":0, "nobuflisted":[], "filetype":"python"}
     let defopts["WindowPreview"] = 0
     let defopts["WindowFixed"] = 0
-    let python_builtins = "__import__(\"__builtin__\")"
+    let python_builtins = "__import__(\"builtins\")"
     let defopts["HelpFormat"] = printf("try:exec(\"%s.help({0})\")\nexcept SyntaxError:%s.help(\"{0}\")", escape(python_builtins, "\"\\"), python_builtins)
     " let defopts["EvalFormat"] = printf("_={};print _')", python_builtins, python_builtins, python_builtins)
     " let defopts["EvalFormat"] = printf("__incpy__.sys.displayhook({})')")
