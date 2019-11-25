@@ -15,7 +15,7 @@ try:
             def __new__(cls, prefix="", name=None):
                 ns = cls.__dict__.copy()
                 ns.setdefault('prefix', (prefix+':') if len(prefix)> 0 else prefix)
-                map(lambda n,d=ns: d.pop(n,None), ('__new__','__dict__','__weakref__'))
+                [ ns.pop(item, None) for item in ('__new__','__dict__','__weakref__') ]
                 result = type( (prefix+cls.__name__[1:]) if name is None else name, (object,), ns)
                 return result()
             def __getitem__(self, name):
@@ -35,7 +35,7 @@ try:
             if isinstance(n, six.string_types):
                 return "{!r}".format(n)
             if isinstance(n, list):
-                return "[{:s}]".format(','.join(map(cls._to,n)))
+                return "[{:s}]".format(','.join(map(cls._to, n)))
             if isinstance(n, dict):
                 return "{{{:s}}}".format(','.join((':'.join((cls._to(k), cls._to(v))) for k, v in six.iteritems(n))))
             raise Exception("Unknown type {:s} : {!r}".format(type(n),n))
@@ -53,7 +53,7 @@ try:
                 except ValueError: pass
                 return str(n)
             if isinstance(n, list):
-                return map(cls._from, n)
+                return [ cls._from(item) for item in n ]
             if isinstance(n, dict):
                 return { str(k) : cls._from(v) for k, v in six.iteritems(n) }
             return n
@@ -100,7 +100,7 @@ try:
             @classmethod
             def Function(cls, name):
                 def caller(*args):
-                    return cls.command("call {:s}({:s})".format(name,','.join(map(cls._to,args))))
+                    return cls.command("call {:s}({:s})".format(name, ','.join(map(cls._to, args))))
                 caller.__name__ = name
                 return caller
 
@@ -172,7 +172,7 @@ try:
         def write(self, data):
             result = iter(data.split('\n'))
             self.buffer[-1] += six.next(result)
-            map(self.buffer.append, result)
+            [ self.buffer.append(item) for item in result ]
 
         def clear(self): self.buffer[:] = ['']
 
@@ -394,7 +394,7 @@ class process(object):
             res = process.monitorPipe(self.taskQueue, (stdout, self.program.stdout), name=name)
 
         ## attach a friendly method that allows injection of data into the monitor
-        res = map(None, res)
+        res = list(res)
         for t, q in res: t.send = q.send
         threads, senders = zip(*res)
 
@@ -474,7 +474,7 @@ class process(object):
                     # determine why (cause...y'know..python), stop dancing so
                     # the parent will actually be able to terminate us
                     break
-                map(send, data)
+                [ send(item) for item in data ]
             return
 
         ## create our shuffling thread
@@ -601,7 +601,7 @@ class process(object):
         import operator
 
         # XXX: there should be a better way to block until all threads have joined
-        map(operator.methodcaller('join'), self.threads)
+        [ th.join() for th in self.threads ]
 
         # now spin until none of them are alive
         while len(self.threads) > 0:
