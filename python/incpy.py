@@ -2,7 +2,15 @@ import six, sys, logging
 logger = logging.getLogger('incpy').getChild('py')
 
 try:
-    import vim as _vim,exceptions
+    import vim as _vim
+
+    # Try python2's exceptions module first
+    try:
+        import exceptions
+
+    # Otherwise we're using Python3 and it's a builtin
+    except ImportError:
+        import builtins as exceptions
 
     # vim wrapper
     class vim(object):
@@ -235,11 +243,19 @@ except ImportError:
         import threading
         Thread, Event = map(staticmethod, (threading.Thread, threading.Event))
 
-        import Queue
-        Queue, QueueEmptyException = map(staticmethod, (Queue.Queue, Queue.Empty))
-
         import subprocess
         spawn, spawn_options = map(staticmethod, (subprocess.Popen, subprocess))
+
+        # Try importing with Python3's name first
+        try:
+            import queue as Queue
+
+        # Otherwise we'll try Python2's name
+        except ImportError:
+            import Queue
+
+        Queue, QueueEmptyException = map(staticmethod, (Queue.Queue, Queue.Empty))
+
 
 ### asynchronous process monitor
 import sys, os, weakref, time, itertools, shlex
