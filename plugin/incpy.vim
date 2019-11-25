@@ -415,7 +415,7 @@ class interpreter_external(__incpy__.interpreter):
     @__incpy__.builtin.classmethod
     def new(cls, command, **options):
         res = cls(**options)
-        __incpy__.builtin.map(lambda n, d=options: d.pop(n, None), cls.view_options)
+        [ options.pop(item, None) for item in cls.view_options ]
         res.command,res.options = command,options
         return res
     def attach(self):
@@ -477,11 +477,11 @@ class internal(object):
 
         getCurrent = __incpy__.builtin.staticmethod(lambda: __incpy__.builtin.int(__incpy__.vim.eval('tabpagenr()')) - 1)
         getCount = __incpy__.builtin.staticmethod(lambda: __incpy__.builtin.int(__incpy__.vim.eval('tabpagenr("$")')))
-        getBuffers = __incpy__.builtin.staticmethod(lambda n: __incpy__.builtin.map(int,__incpy__.vim.eval("tabpagebuflist({:d})".format(n-1))))
+        getBuffers = __incpy__.builtin.staticmethod(lambda n: [ __incpy__.builtin.int(item) for item in __incpy__.vim.eval("tabpagebuflist({:d})".format(n - 1)) ])
 
-        getWindowCurrent = __incpy__.builtin.staticmethod(lambda n: __incpy__.builtin.int(__incpy__.vim.eval("tabpagewinnr({:d})".format(n-1))))
-        getWindowPrevious = __incpy__.builtin.staticmethod(lambda n: __incpy__.builtin.int(__incpy__.vim.eval("tabpagewinnr({:d}, '#')".format(n-1))))
-        getWindowCount = __incpy__.builtin.staticmethod(lambda n: __incpy__.builtin.int(__incpy__.vim.eval("tabpagewinnr({:d}, '$')".format(n-1))))
+        getWindowCurrent = __incpy__.builtin.staticmethod(lambda n: __incpy__.builtin.int(__incpy__.vim.eval("tabpagewinnr({:d})".format(n - 1))))
+        getWindowPrevious = __incpy__.builtin.staticmethod(lambda n: __incpy__.builtin.int(__incpy__.vim.eval("tabpagewinnr({:d}, '#')".format(n - 1))))
+        getWindowCount = __incpy__.builtin.staticmethod(lambda n: __incpy__.builtin.int(__incpy__.vim.eval("tabpagewinnr({:d}, '$')".format(n - 1))))
 
     class buffer(object):
         """Internal vim commands for getting information about a buffer"""
@@ -529,13 +529,13 @@ class internal(object):
         @__incpy__.builtin.staticmethod
         def select(window):
             '''Select the window with the specified id'''
-            return (__incpy__.builtin.int(__incpy__.vim.eval('winnr()')),__incpy__.vim.command("{:d} wincmd w".format(window)))[0]
+            return (__incpy__.builtin.int(__incpy__.vim.eval('winnr()')), __incpy__.vim.command("{:d} wincmd w".format(window)))[0]
         @__incpy__.builtin.staticmethod
         def currentsize(position):
             builtin = __incpy__.builtin
-            if position in ('left','right'):
+            if position in ('left', 'right'):
                 return builtin.int(__incpy__.vim.eval('winwidth(0)'))
-            if position in ('above','below'):
+            if position in ('above', 'below'):
                 return builtin.int(__incpy__.vim.eval('winheight(0)'))
             raise builtin.ValueError(position)
 
@@ -608,7 +608,7 @@ class internal(object):
         @__incpy__.builtin.classmethod
         def savesize(cls, bufferid):
             last = cls.select( cls.buffer(bufferid) )
-            w,h = __incpy__.builtin.map(__incpy__.vim.eval, ('winwidth(0)','winheight(0)'))
+            w, h = __incpy__.builtin.map(__incpy__.vim.eval, ['winwidth(0)', 'winheight(0)'])
             cls.select(last)
             return { 'width':w, 'height':h }
         @__incpy__.builtin.classmethod
@@ -689,7 +689,7 @@ __incpy__.view = view; del(view)
 
 # spawn interpreter requested by user
 _ = __incpy__.vim.gvars["incpy#Program"]
-opt = {'winfixwidth':True,'winfixheight':True} if __incpy__.vim.gvars["incpy#WindowFixed"]>0 else {}
+opt = {'winfixwidth':True,'winfixheight':True} if __incpy__.vim.gvars["incpy#WindowFixed"] > 0 else {}
 try:
     __incpy__.cache = __incpy__.interpreter_external.new(_, opt=opt) if len(_) > 0 else __incpy__.interpreter_python_internal.new(opt=opt)
 except:
