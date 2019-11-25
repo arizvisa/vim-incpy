@@ -243,14 +243,14 @@ function! incpy#SetupPython(currentscriptpath)
     " FIXME: use sys.meta_path
 
     " setup the default logger
-    python __import__('logging').basicConfig()
-    python __import__('logging').getLogger('incpy')
+    pythonx __import__('logging').basicConfig()
+    pythonx __import__('logging').getLogger('incpy')
 
     " add the python path using the runtimepath directory that this script is contained in
     for p in split(&runtimepath, ",")
         let p = substitute(p, "\\", "/", "g")
         if stridx(m, p, 0) == 0
-            execute printf("python __import__('sys').path.append('%s/python')", p)
+            execute printf("pythonx __import__('sys').path.append('%s/python')", p)
             return
         endif
     endfor
@@ -258,7 +258,7 @@ function! incpy#SetupPython(currentscriptpath)
     " otherwise, look up from our current script's directory for a python sub-directory
     let p = finddir("python", m . ";")
     if isdirectory(p)
-        execute printf("python __import__('sys').path.append('%s')", p)
+        execute printf("pythonx __import__('sys').path.append('%s')", p)
         return
     endif
 
@@ -298,14 +298,14 @@ function! incpy#Setup()
     " Set any the options for the python module part.
     if g:incpy#Greenlets > 0
         " If greenlets were specified, then enable it by importing 'gevent' into the current python environment
-        python __import__('gevent')
+        pythonx __import__('gevent')
     elseif g:incpy#Program != ""
         " Otherwise we only need to warn the user that they should use it if they're trying to run an external program
         echohl WarningMsg | echomsg "WARNING:incpy.vim:Using vim-incpy to run an external program without support for greenlets will be unstable" | echohl None
     endif
 
     " Initialize the python __incpy__ namespace
-    python <<EOF
+    pythonx <<EOF
 
 # create a pseudo-builtin module
 __incpy__ = __builtins__.__class__('__incpy__', 'Internal state module for vim-incpy')
@@ -712,23 +712,23 @@ endfunction
 """ Plugin management interface
 function! incpy#Start()
     " Start the target program and attach it to a buffer
-    python __incpy__.cache.start()
+    pythonx __incpy__.cache.start()
 endfunction
 
 function! incpy#Stop()
     " Stop the target program and detach it from its buffer
-    python __incpy__.cache.stop()
+    pythonx __incpy__.cache.stop()
 endfunction
 
 function! incpy#Restart()
     " Restart the target program
-    python __incpy__.cache.stop()
-    python __incpy__.cache.start()
+    pythonx __incpy__.cache.stop()
+    pythonx __incpy__.cache.start()
 endfunction
 
 """ Plugin interaction interface
 function! incpy#Execute(line)
-    execute printf("python __incpy__.cache.communicate('%s')", escape(a:line, "'\\"))
+    execute printf("pythonx __incpy__.cache.communicate('%s')", escape(a:line, "'\\"))
     if g:incpy#OutputFollow
         call s:windowtail(g:incpy#BufferId)
     endif
@@ -746,7 +746,7 @@ function! incpy#Range(begin, end)
 
     " Execute the lines in our target
     let code_s = join(map(lines, 'escape(v:val, "''\\")'), "\\n")
-    execute printf("python __incpy__.cache.communicate('%s')", code_s)
+    execute printf("pythonx __incpy__.cache.communicate('%s')", code_s)
 
     " If the user configured us to follow the output, then do as we were told.
     if g:incpy#OutputFollow
@@ -756,7 +756,7 @@ endfunction
 
 function! incpy#Evaluate(expr)
     " Evaluate and emit an expression in the target using the plugin
-    execute printf("python __incpy__.cache.communicate(\"%s\".format(\"%s\"))", s:singleline(g:incpy#EvalFormat, "\"\\"), escape(a:expr, "\"\\"))
+    execute printf("pythonx __incpy__.cache.communicate(\"%s\".format(\"%s\"))", s:singleline(g:incpy#EvalFormat, "\"\\"), escape(a:expr, "\"\\"))
 
     if g:incpy#OutputFollow
         call s:windowtail(g:incpy#BufferId)
@@ -768,7 +768,7 @@ function! incpy#Halp(expr)
     let LetMeSeeYouStripped = substitute(a:expr, '^[ \t\n]\+\|[ \t\n]\+$', '', 'g')
 
     " Execute g:incpy#HelpFormat in the target using the plugin's cached communicator
-    execute printf("python __incpy__.cache.communicate(\"%s\".format(\"%s\"))", s:singleline(g:incpy#HelpFormat, "\"\\"), escape(LetMeSeeYouStripped, "\"\\"))
+    execute printf("pythonx __incpy__.cache.communicate(\"%s\".format(\"%s\"))", s:singleline(g:incpy#HelpFormat, "\"\\"), escape(LetMeSeeYouStripped, "\"\\"))
 endfunction
 
 """ Actual execution and setup of the plugin
@@ -780,15 +780,15 @@ endfunction
     call incpy#SetupKeys()
 
     " on entry, silently import the user module to honor any user-specific configurations
-    autocmd VimEnter * python hasattr(__incpy__, 'cache') and __incpy__.cache.attach()
-    autocmd VimLeavePre * python hasattr(__incpy__, 'cache') and __incpy__.cache.detach()
+    autocmd VimEnter * pythonx hasattr(__incpy__, 'cache') and __incpy__.cache.attach()
+    autocmd VimLeavePre * pythonx hasattr(__incpy__, 'cache') and __incpy__.cache.detach()
 
     " if greenlets were specifed then make sure to update them during cursor movement
     if g:incpy#Greenlets > 0
-        autocmd CursorHold * python __import__('gevent').idle(0.0)
-        autocmd CursorHoldI * python __import__('gevent').idle(0.0)
-        autocmd CursorMoved * python __import__('gevent').idle(0.0)
-        autocmd CursorMovedI * python __import__('gevent').idle(0.0)
+        autocmd CursorHold * pythonx __import__('gevent').idle(0.0)
+        autocmd CursorHoldI * pythonx __import__('gevent').idle(0.0)
+        autocmd CursorMoved * pythonx __import__('gevent').idle(0.0)
+        autocmd CursorMovedI * pythonx __import__('gevent').idle(0.0)
     endif
 
 else
