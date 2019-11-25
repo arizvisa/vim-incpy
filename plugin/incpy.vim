@@ -95,7 +95,7 @@
 "   buffer so that management of multiple program buffers would be local to
 "   whatever the user is currently editing.
 
-if has("python")
+if has("python") || has("python3")
 
 """ Utility functions for indentation stuff
 function! s:count_indent(string)
@@ -330,8 +330,10 @@ class interpreter(object):
         opt.update(kwds.pop('opt',{}))
         kwds.setdefault('preview', __incpy__.vim.gvars['incpy#WindowPreview'])
         kwds.setdefault('tab', __incpy__.internal.tab.getCurrent())
-        self.view = __incpy__.view(kwds.pop('buffer',None) or __incpy__.vim.gvars['incpy#WindowName'], opt, **kwds)
+        self.view = __incpy__.view(kwds.pop('buffer', None) or __incpy__.vim.gvars['incpy#WindowName'], opt, **kwds)
     def __del__(self):
+        if __incpy__.sys.version_info.major >= 3:
+            return
         return self.detach()
     def write(self, data):
         """Writes data directly into view"""
@@ -693,7 +695,7 @@ opt = {'winfixwidth':True,'winfixheight':True} if __incpy__.vim.gvars["incpy#Win
 try:
     __incpy__.cache = __incpy__.interpreter_external.new(_, opt=opt) if len(_) > 0 else __incpy__.interpreter_python_internal.new(opt=opt)
 except:
-    __incpy__.logger.fatal("error starting external interpreter: {:s}".format(_.decode('ascii')), exc_info=True)
+    __incpy__.logger.fatal("error starting external interpreter: {:s}".format(_), exc_info=True)
     __incpy__.logger.warning("falling back to internal python interpreter")
     __incpy__.cache = __incpy__.interpreter_python_internal.new(opt=opt)
 del(opt)
