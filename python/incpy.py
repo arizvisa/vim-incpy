@@ -525,7 +525,10 @@ class process(object):
         Each thread will read from `pipe`, and stuff the value combined with `id` into `q`.
         """
         def stuff(q, *key):
-            while True: q.put(key + ((yield),))
+            while True:
+                item = (yield),
+                q.put(key + item)
+            return
 
         for id, pipe in itertools.chain([target], more):
             res, name = stuff(q, id), "{:s}<{!r}>".format(options.get('name', ''), id)
