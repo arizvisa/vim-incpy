@@ -13,7 +13,7 @@ try:
 
         class _vars(object):
             def __new__(cls, prefix="", name=None):
-                ns = dict(cls.__dict__)
+                ns = cls.__dict__.copy()
                 ns.setdefault('prefix', (prefix+':') if len(prefix)> 0 else prefix)
                 map(lambda n,d=ns: d.pop(n,None), ('__new__','__dict__','__weakref__'))
                 result = type( (prefix+cls.__name__[1:]) if name is None else name, (object,), ns)
@@ -28,21 +28,21 @@ try:
         # converters
         @classmethod
         def _to(cls, n):
-            if type(n) in six.integer_types:
+            if isinstance(n, six.integer_types):
                 return str(n)
-            if type(n) is float:
+            if isinstance(n, float):
                 return "{:f}".format(n)
-            if type(n) in six.string_types:
+            if isinstance(n, six.string_types):
                 return "{!r}".format(n)
-            if type(n) is list:
+            if isinstance(n, list):
                 return "[{:s}]".format(','.join(map(cls._to,n)))
-            if type(n) is dict:
+            if isinstance(n, dict):
                 return "{{{:s}}}".format(','.join((':'.join((cls._to(k), cls._to(v))) for k, v in six.iteritems(n))))
             raise Exception("Unknown type {:s} : {!r}".format(type(n),n))
 
         @classmethod
         def _from(cls, n):
-            if type(n) in six.string_types:
+            if isinstance(n, six.string_types):
                 if n.startswith('['):
                     return cls._from(eval(n))
                 if n.startswith('{'):
@@ -52,10 +52,10 @@ try:
                 try: return int(n)
                 except ValueError: pass
                 return str(n)
-            if type(n) is list:
+            if isinstance(n, list):
                 return map(cls._from, n)
-            if type(n) is dict:
-                return dict((str(k), cls._from(v)) for k, v in six.iteritems(n))
+            if isinstance(n, dict):
+                return { str(k) : cls._from(v) for k, v in six.iteritems(n) }
             return n
 
         # error class
@@ -291,7 +291,7 @@ class process(object):
         self.__threads = weakref.WeakSet()
         self.__kwds = kwds
 
-        args = shlex.split(command) if isinstance(command, basestring) else command[:]
+        args = shlex.split(command) if isinstance(command, six.string_types) else command[:]
         command = args.pop(0)
         self.command = command, args[:]
 
@@ -425,7 +425,7 @@ class process(object):
         options['shell'] = shell
 
         ## split our arguments out if necessary
-        command = shlex.split(program) if isinstance(program, basestring) else program[:]
+        command = shlex.split(program) if isinstance(program, six.string_types) else program[:]
 
         ## finally hand it off to subprocess.Popen
         try: return Asynchronous.spawn(command, **options)
