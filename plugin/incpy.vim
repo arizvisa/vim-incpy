@@ -309,11 +309,11 @@ function! incpy#Setup()
 
 # create a pseudo-builtin module
 __incpy__ = __builtins__.__class__('__incpy__', 'Internal state module for vim-incpy')
-__incpy__.sys,__incpy__.incpy,__incpy__.builtin = __import__('sys'),__import__('incpy'),__import__('__builtin__')
-__incpy__.vim,__incpy__.buffer,__incpy__.spawn = __incpy__.incpy.vim,__incpy__.incpy.buffer,__incpy__.incpy.spawn
+__incpy__.sys, __incpy__.incpy, __incpy__.builtin, __incpy__.six = __import__('sys'), __import__('incpy'), __import__('builtins'), __import__('six')
+__incpy__.vim, __incpy__.buffer, __incpy__.spawn = __incpy__.incpy.vim, __incpy__.incpy.buffer, __incpy__.incpy.spawn
 
 # save initial state
-__incpy__.state = __incpy__.builtin.tuple((__incpy__.builtin.getattr(__incpy__.sys,_) for _ in ('stdin','stdout','stderr')))
+__incpy__.state = __incpy__.builtin.tuple(__incpy__.builtin.getattr(__incpy__.sys, _) for _ in ['stdin', 'stdout', 'stderr'])
 __incpy__.logger = __import__('logging').getLogger('incpy').getChild('vim')
 
 # interpreter classes
@@ -362,7 +362,7 @@ class interpreter_python_internal(__incpy__.interpreter):
     state = None
     def attach(self):
         sys, logging, logger = __incpy__.sys, __import__('logging'), __incpy__.logger
-        self.state = sys.stdin,sys.stdout,sys.stderr,logger
+        self.state = sys.stdin, sys.stdout, sys.stderr, logger
 
         # notify the user
         logger.debug("redirecting sys.stdin, sys.stdout, and sys.stderr to {!r}".format(self.view))
@@ -385,7 +385,7 @@ class interpreter_python_internal(__incpy__.interpreter):
         # remove the python output window formatter from the root logger
         logger.debug("removing window handler from root logger")
         try:
-            logger.root.removeHandler(next(L for L in logger.root.handlers if isinstance(L, logging.StreamHandler) and type(L.stream).__name__ == 'view'))
+            logger.root.removeHandler(__incpy__.six.next(L for L in logger.root.handlers if isinstance(L, logging.StreamHandler) and type(L.stream).__name__ == 'view'))
         except StopIteration:
             pass
 
@@ -402,8 +402,7 @@ class interpreter_python_internal(__incpy__.interpreter):
             echo = '\n'.join(map(echoformat.format, data.split('\n')))
             echo = inputformat.format(echo)
             self.view.write(echo)
-        input = data
-        exec input in __incpy__.builtin.globals()
+        __incpy__.six.exec_(data, __incpy__.builtin.globals())
     def start(self):
         __incpy__.logger.warn("internal interpreter has already been (implicitly) started")
     def stop(self):
@@ -416,7 +415,7 @@ class interpreter_external(__incpy__.interpreter):
     @__incpy__.builtin.classmethod
     def new(cls, command, **options):
         res = cls(**options)
-        __incpy__.builtin.map(lambda n,d=options:d.pop(n,None), cls.view_options)
+        __incpy__.builtin.map(lambda n, d=options: d.pop(n, None), cls.view_options)
         res.command,res.options = command,options
         return res
     def attach(self):
@@ -512,10 +511,10 @@ class internal(object):
         def optionsToCommandLine(options):
             builtin = __incpy__.builtin
             result = []
-            for k,v in options.iteritems():
-                if builtin.isinstance(v, (int,long)):
+            for k, v in __incpy__.six.iteritems(options):
+                if builtin.isinstance(v, __incpy__.six.integer_types):
                     result.append("{:s}={:d}".format(k,v))
-                elif builtin.isinstance(v, basestring):
+                elif builtin.isinstance(v, __incpy__.six.string_types):
                     result.append("{:s}={:s}".format(k,v))
                 else:
                     result.append(k)
@@ -636,9 +635,9 @@ class view(object):
 
     def __get_buffer(self, target):
         builtin = __incpy__.builtin
-        if builtin.isinstance(target, int):
+        if builtin.isinstance(target, six.integer_types):
             return __incpy__.buffer.from_id(target)
-        elif builtin.isinstance(target, basestring):
+        elif builtin.isinstance(target, six.string_types):
             try: return __incpy__.buffer.from_name(target)
             except: return __incpy__.buffer.new(target)
         raise __incpy__.incpy.error, "Unable to determine output buffer from parameter : {!r}".format(target)
