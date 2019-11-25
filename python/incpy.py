@@ -35,7 +35,7 @@ try:
                     else:
                         yield item
                     continue
-                return item
+                return
             def __insert__(self, index, value):
                 self.__backing__.insert(index, value)
             def __getitem__(self, index):
