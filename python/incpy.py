@@ -185,7 +185,7 @@ try:
         def clear(self): self.buffer[:] = ['']
 
 except ImportError:
-    logger.warn('unable to import the vim module for python-vim. skipping the definition of its wrappers.')
+    logger.warning('unable to import the vim module for python-vim. skipping the definition of its wrappers.')
 
 try:
     # make sure the user has selected the gevent-based version by importing gevent

@@ -389,7 +389,7 @@ class interpreter_python_internal(__incpy__.interpreter):
         except StopIteration:
             pass
 
-        logger.warn("detaching internal interpreter from sys.stdin, sys.stdout, and sys.stderr.")
+        logger.warning("detaching internal interpreter from sys.stdin, sys.stdout, and sys.stderr.")
 
         # notify the user that we're restoring the original state
         logger.debug("restoring sys.stdin, sys.stdout, and sys.stderr from: {!r}".format(self.state))
@@ -404,7 +404,7 @@ class interpreter_python_internal(__incpy__.interpreter):
             self.view.write(echo)
         __incpy__.six.exec_(data, __incpy__.builtin.globals())
     def start(self):
-        __incpy__.logger.warn("internal interpreter has already been (implicitly) started")
+        __incpy__.logger.warning("internal interpreter has already been (implicitly) started")
     def stop(self):
         __incpy__.logger.fatal("unable to stop internal interpreter as it is always running")
 __incpy__.interpreter_python_internal = interpreter_python_internal; del(interpreter_python_internal)
@@ -640,7 +640,7 @@ class view(object):
         elif builtin.isinstance(target, six.string_types):
             try: return __incpy__.buffer.from_name(target)
             except: return __incpy__.buffer.new(target)
-        raise __incpy__.incpy.error("Unable to determine output buffer from parameter : {!r}".format(target))
+        raise __incpy__.incpy.vim.error("Unable to determine output buffer from parameter : {!r}".format(target))
 
     def write(self, data):
         """Write data directly into window contents (updating buffer)"""
@@ -693,8 +693,8 @@ opt = {'winfixwidth':True,'winfixheight':True} if __incpy__.vim.gvars["incpy#Win
 try:
     __incpy__.cache = __incpy__.interpreter_external.new(_, opt=opt) if len(_) > 0 else __incpy__.interpreter_python_internal.new(opt=opt)
 except:
-    __incpy__.logger.fatal("error starting external interpreter: {:s}".format(_), exc_info=True)
-    __incpy__.logger.warn("falling back to internal python interpreter")
+    __incpy__.logger.fatal("error starting external interpreter: {:s}".format(_.decode('ascii')), exc_info=True)
+    __incpy__.logger.warning("falling back to internal python interpreter")
     __incpy__.cache = __incpy__.interpreter_python_internal.new(opt=opt)
 del(opt)
 
