@@ -634,7 +634,7 @@ class view(object):
         # FIXME: creating a view in another tab is not supported yet
 
     def __get_buffer(self, target):
-        builtin = __incpy__.builtin
+        six, builtin = __incpy__.six, __incpy__.builtin
         if builtin.isinstance(target, six.integer_types):
             return __incpy__.buffer.from_id(target)
         elif builtin.isinstance(target, six.string_types):
