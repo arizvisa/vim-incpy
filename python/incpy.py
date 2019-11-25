@@ -14,6 +14,70 @@ try:
 
     # vim wrapper
     class vim(object):
+        try:
+            import collections.abc as collections
+        except ImportError:
+            import collections
+
+        class _autofixlist(collections.MutableMapping):
+            def __init__(self, backing):
+                self.__backing__ = backing
+            def __len__(self):
+                return len(self.__backing__)
+            def __iter__(self):
+                for item in self.__backing__:
+                    if isinstance(res, bytes):
+                        yield item.decode('ascii')
+                    elif hasattr(_vim, 'Dictionary') and isinstance(res, _vim.Dictionary):
+                        yield vim._autofixdict(item)
+                    elif hasattr(_vim, 'List') and isinstance(res, _vim.List):
+                        yield vim._autofixlist(item)
+                    else:
+                        yield item
+                    continue
+                return item
+            def __insert__(self, index, value):
+                self.__backing__.insert(index, value)
+            def __getitem__(self, index):
+                res = self.__backing__[index]
+                if isinstance(res, bytes):
+                    return res.decode('ascii')
+                elif hasattr(_vim, 'Dictionary') and isinstance(res, _vim.Dictionary):
+                    return vim._autofixdict(res)
+                elif hasattr(_vim, 'List') and isinstance(res, _vim.List):
+                    return vim._autofixlist(res)
+                return res
+            def __setitem__(self, index, value):
+                self.__backing__[index] = value
+            def __delitem__(self, index):
+                del self.__backing__[index]
+
+        class _autofixdict(collections.MutableMapping):
+            def __init__(self, backing):
+                self.__backing__ = backing
+            def __iter__(self):
+                for name in self.__backing__.keys():
+                    yield name.decode('ascii') if isinstance(name, bytes) else name
+                return
+            def __len__(self):
+                return len(self.__backing__)
+            def __getitem__(self, name):
+                rname = name.encode('ascii')
+                res = self.__backing__[rname]
+                if isinstance(res, bytes):
+                    return res.decode('ascii')
+                elif hasattr(_vim, 'Dictionary') and isinstance(res, _vim.Dictionary):
+                    return vim._autofixdict(res)
+                elif hasattr(_vim, 'List') and isinstance(res, _vim.List):
+                    return vim._autofixlist(res)
+                return res
+            def __setitem__(self, name, value):
+                rname = name.encode('ascii')
+                self.__backing__[rname] = value
+            def __delitem__(self, name):
+                realname = name.encode('ascii')
+                del self.__backing__[rname]
+
         class _accessor(object):
             def __init__(self, result): self.result = result
             def __get__(self, obj, objtype): return self.result
@@ -22,9 +86,9 @@ try:
         class _vars(object):
             def __new__(cls, prefix="", name=None):
                 ns = cls.__dict__.copy()
-                ns.setdefault('prefix', (prefix+':') if len(prefix)> 0 else prefix)
-                [ ns.pop(item, None) for item in ('__new__','__dict__','__weakref__') ]
-                result = type( (prefix+cls.__name__[1:]) if name is None else name, (object,), ns)
+                ns.setdefault('prefix', (prefix + ':') if len(prefix) > 0 else prefix)
+                [ ns.pop(item, None) for item in ['__new__', '__dict__', '__weakref__'] ]
+                result = type( (prefix + cls.__name__[1:]) if name is None else name, (object,), ns)
                 return result()
             def __getitem__(self, name):
                 try: return vim.eval(self.prefix + name)
@@ -94,10 +158,13 @@ try:
             def eval(cls, string): return cls._from(_vim.eval(string))
 
         # global variables
-        gvars = _accessor(_vim.vars) if hasattr(_vim, 'vars') else _vars('g')
+        if hasattr(_vim, 'vars'):
+            gvars = _autofixdict(_vim.vars) if hasattr(_vim, 'Dictionary') and isinstance(_vim.vars, _vim.Dictionary) else _vim.vars
+        else:
+            gvars = _vars('g')
 
         # misc variables (buffer, window, tab, script, vim)
-        bvars,wvars,tvars,svars,vvars = map(_vars, 'bwtsv')
+        bvars, wvars, tvars, svars, vvars = map(_vars, 'bwtsv')
 
         # functions
         if hasattr(_vim, 'Function'):
@@ -122,6 +189,8 @@ try:
             self.buffer = buffer
             #self.writing = threading.Lock()
         def __del__(self):
+            if sys.version_info.major >= 3:
+                return
             self.__destroy(self.buffer)
 
         # creating a buffer from various input
@@ -255,7 +324,6 @@ except ImportError:
             import Queue
 
         Queue, QueueEmptyException = map(staticmethod, (Queue.Queue, Queue.Empty))
-
 
 ### asynchronous process monitor
 import sys, os, weakref, time, itertools, shlex
