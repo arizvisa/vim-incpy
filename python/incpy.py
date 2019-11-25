@@ -564,7 +564,7 @@ class process(object):
         pid = self.program.pid
         try:
             self.program.kill()
-        except OSError, e:
+        except OSError as e:
             logger.fatal("{:s}.__terminate : Exception {!r} was raised while trying to kill process {:d}. Terminating its management threads regardless.".format('.'.join((__name__, self.__class__.__name__)), e, pid), exc_info=True)
         finally:
             while self.running: continue
