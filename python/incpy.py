@@ -1,4 +1,4 @@
-import sys, logging
+import six, sys, logging
 logger = logging.getLogger('incpy').getChild('py')
 
 try:
@@ -28,21 +28,21 @@ try:
         # converters
         @classmethod
         def _to(cls, n):
-            if type(n) in (int,long):
+            if type(n) in six.integer_types:
                 return str(n)
             if type(n) is float:
                 return "{:f}".format(n)
-            if type(n) is str:
+            if type(n) in six.string_types:
                 return "{!r}".format(n)
             if type(n) is list:
                 return "[{:s}]".format(','.join(map(cls._to,n)))
             if type(n) is dict:
-                return "{{{:s}}}".format(','.join((':'.join((cls._to(k),cls._to(v))) for k,v in n.iteritems())))
+                return "{{{:s}}}".format(','.join((':'.join((cls._to(k), cls._to(v))) for k, v in six.iteritems(n))))
             raise Exception("Unknown type {:s} : {!r}".format(type(n),n))
 
         @classmethod
         def _from(cls, n):
-            if type(n) is str:
+            if type(n) in six.string_types:
                 if n.startswith('['):
                     return cls._from(eval(n))
                 if n.startswith('{'):
@@ -55,7 +55,7 @@ try:
             if type(n) is list:
                 return map(cls._from, n)
             if type(n) is dict:
-                return dict((str(k),cls._from(v)) for k,v in n.iteritems())
+                return dict((str(k), cls._from(v)) for k, v in six.iteritems(n))
             return n
 
         # error class
@@ -171,7 +171,7 @@ try:
         ## editing buffer
         def write(self, data):
             result = iter(data.split('\n'))
-            self.buffer[-1] += result.next()
+            self.buffer[-1] += six.next(result)
             map(self.buffer.append, result)
 
         def clear(self): self.buffer[:] = ['']
@@ -445,7 +445,7 @@ class process(object):
 
         for id, pipe in itertools.chain([target], more):
             res, name = stuff(q, id), "{:s}<{!r}>".format(options.get('name', ''), id)
-            yield process.monitor(res.next() or res.send, pipe, name=name), res
+            yield process.monitor(six.next(res) or res.send, pipe, name=name), res
         return
 
     @staticmethod
@@ -537,7 +537,7 @@ class process(object):
             while self.running and self.eventWorking.is_set() and time.time() - t < timeout:
                 if not self.exceptionQueue.empty():
                     res = self.exception()
-                    raise res[0], res[1], res[2]
+                    six.reraise(res[0], res[1], res[2])
                 continue
             return self.program.returncode if self.eventWorking.is_set() else self.__terminate()
 
@@ -548,7 +548,7 @@ class process(object):
         while self.running and self.eventWorking.is_set():
             if not self.exceptionQueue.empty():
                 res = self.exception()
-                raise res[0], res[1], res[2]
+                six.reraise(res[0], res[1], res[2])
             continue    # ugh...poll-forever (and kill-cpu) until program terminates...
 
         if not self.eventWorking.is_set():
@@ -574,7 +574,7 @@ class process(object):
             return self.program.returncode
 
         res = self.exception()
-        raise res[0], res[1], res[2]
+        six.reraise(res[0], res[1], res[2])
 
     def __stop_monitoring(self):
         '''Cleanup monitoring threads.'''
@@ -640,10 +640,10 @@ def spawn(stdout, command, **options):
 
     # empty out the first generator result if a coroutine is passed
     if hasattr(stdout, 'send'):
-        res = stdout.next()
+        res = six.next(stdout)
         res and P.write(res)
     if hasattr(stderr, 'send'):
-        res = stderr.next()
+        res = six.next(stderr)
         res and P.write(res)
 
     # spawn the sub-process
