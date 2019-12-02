@@ -504,6 +504,7 @@ class process(object):
             options.update(dict(close_fds=False, startupinfo=si, creationflags=cf))
         else:
             options['close_fds'] = True
+        options['bufsize'] = 0
         options['cwd'] = cwd
         options['env'] = environment
         options['shell'] = shell
