@@ -286,9 +286,9 @@ function! incpy#SetupKeys()
     vnoremap ! :PyRange<C-M>
 
     " python-specific mappings
-    nnoremap <C-\> :call incpy#Evaluate(expand("<cword>"))<C-M>
+    nnoremap <C-\> :call incpy#Evaluate(expand("<cexpr>"))<C-M>
     vnoremap <C-\> :PyEvalRange<C-M>
-    nnoremap <C-@> :call incpy#Halp(expand("<cword>"))<C-M>
+    nnoremap <C-@> :call incpy#Halp(expand("<cexpr>"))<C-M>
     vnoremap <C-@> :PyHelpRange<C-M>
 endfunction
 
