@@ -229,7 +229,7 @@ function! incpy#SetupOptions()
     let defopts["EchoFormat"] = "# >>> {}"
 
     " Default window options that the user will override
-    let defopts["CoreWindowOptions"] = {"buftype": has("terminal")? "terminal" : "nowrite", "noswapfile":[], "updatecount":0, "nobuflisted":[]}
+    let defopts["CoreWindowOptions"] = {"buftype": has("terminal")? "terminal" : "nowrite", "swapfile": v:false, "updatecount":0, "buflisted": v:false}
 
     " If any of these options aren't defined during evaluation, then go through and assign them as defaults
     for o in keys(defopts)
@@ -518,12 +518,14 @@ class internal(object):
             builtin = __incpy__.builtin
             result = []
             for k, v in __incpy__.six.iteritems(options):
-                if builtin.isinstance(v, __incpy__.six.integer_types):
-                    result.append("{:s}={:d}".format(k,v))
-                elif builtin.isinstance(v, __incpy__.six.string_types):
+                if builtin.isinstance(v, __incpy__.six.string_types):
                     result.append("{:s}={:s}".format(k,v))
+                elif builtin.isinstance(v, builtin.bool):
+                    result.append("{:s}{:s}".format('' if v else 'no', k))
+                elif builtin.isinstance(v, __incpy__.six.integer_types):
+                    result.append("{:s}={:d}".format(k,v))
                 else:
-                    result.append(k)
+                    raise NotImplementedError(k,v)
                 continue
             return '\\ '.join(result)
 
