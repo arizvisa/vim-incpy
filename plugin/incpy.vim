@@ -219,7 +219,7 @@ function! incpy#SetupOptions()
     let defopts["WindowPreview"] = 0
     let defopts["WindowFixed"] = 0
     let python_builtins = "__import__(\"builtins\")"
-    let defopts["HelpFormat"] = printf("try:exec(\"%s.help({0})\")\nexcept SyntaxError:%s.help(\"{0}\")", escape(python_builtins, "\"\\"), python_builtins)
+    let defopts["HelpFormat"] = printf("try:exec(\"%s.help({0})\")\nexcept SyntaxError:%s.help(\"{0}\")\n", escape(python_builtins, "\"\\"), python_builtins)
     " let defopts["EvalFormat"] = printf("_={};print _')", python_builtins, python_builtins, python_builtins)
     " let defopts["EvalFormat"] = printf("__incpy__.sys.displayhook({})')")
     " let defopts["EvalFormat"] = printf("__incpy__.builtin._={};print __incpy__.__builtin__._")
