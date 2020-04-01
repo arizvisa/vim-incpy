@@ -27,7 +27,7 @@ try:
             def __iter__(self):
                 for item in self.__backing__:
                     if isinstance(res, bytes):
-                        yield item.decode('ascii')
+                        yield item.decode('iso8859-1')
                     elif hasattr(_vim, 'Dictionary') and isinstance(res, _vim.Dictionary):
                         yield vim._autofixdict(item)
                     elif hasattr(_vim, 'List') and isinstance(res, _vim.List):
@@ -41,7 +41,7 @@ try:
             def __getitem__(self, index):
                 res = self.__backing__[index]
                 if isinstance(res, bytes):
-                    return res.decode('ascii')
+                    return res.decode('iso8859-1')
                 elif hasattr(_vim, 'Dictionary') and isinstance(res, _vim.Dictionary):
                     return vim._autofixdict(res)
                 elif hasattr(_vim, 'List') and isinstance(res, _vim.List):
@@ -57,25 +57,25 @@ try:
                 self.__backing__ = backing
             def __iter__(self):
                 for name in self.__backing__.keys():
-                    yield name.decode('ascii') if isinstance(name, bytes) else name
+                    yield name.decode('iso8859-1') if isinstance(name, bytes) else name
                 return
             def __len__(self):
                 return len(self.__backing__)
             def __getitem__(self, name):
-                rname = name.encode('ascii')
+                rname = name.encode('iso8859-1')
                 res = self.__backing__[rname]
                 if isinstance(res, bytes):
-                    return res.decode('ascii')
+                    return res.decode('iso8859-1')
                 elif hasattr(_vim, 'Dictionary') and isinstance(res, _vim.Dictionary):
                     return vim._autofixdict(res)
                 elif hasattr(_vim, 'List') and isinstance(res, _vim.List):
                     return vim._autofixlist(res)
                 return res
             def __setitem__(self, name, value):
-                rname = name.encode('ascii')
+                rname = name.encode('iso8859-1')
                 self.__backing__[rname] = value
             def __delitem__(self, name):
-                realname = name.encode('ascii')
+                realname = name.encode('iso8859-1')
                 del self.__backing__[rname]
 
         class _accessor(object):
@@ -384,7 +384,7 @@ class process(object):
         self.__taskQueue = Asynchronous.Queue()
         self.__exceptionQueue = Asynchronous.Queue()
 
-        self.codec = codecs.lookup(kwds.get('encoding', sys.getdefaultencoding()))
+        self.codec = codecs.lookup(kwds.get('encoding', 'iso8859-1' if sys.getdefaultencoding() == 'ascii' else sys.getdefaultencoding()))
         self.stdout = kwds.pop('stdout')
         self.stderr = kwds.pop('stderr')
 
