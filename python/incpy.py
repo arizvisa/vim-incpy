@@ -358,6 +358,8 @@ class process(object):
     taskQueue = property(fget=lambda self: self.__taskQueue)
     exceptionQueue = property(fget=lambda self: self.__exceptionQueue)
 
+    encoding = property(fget=lambda self: self.codec.name)
+
     def __init__(self, command, **kwds):
         """Creates a new instance that monitors Asynchronous.spawn(`command`), the created process starts in a paused state.
 
@@ -377,12 +379,12 @@ class process(object):
         args = shlex.split(command) if isinstance(command, six.string_types) else command[:]
         command = args.pop(0)
         self.command = command, args[:]
-        self.encoding = kwds.get('encoding', sys.getdefaultencoding())
 
         self.eventWorking = Asynchronous.Event()
         self.__taskQueue = Asynchronous.Queue()
         self.__exceptionQueue = Asynchronous.Queue()
 
+        self.codec = codecs.lookup(kwds.get('encoding', sys.getdefaultencoding()))
         self.stdout = kwds.pop('stdout')
         self.stderr = kwds.pop('stderr')
 
@@ -466,22 +468,33 @@ class process(object):
         updater.start()
         return updater
 
+    def __make_reader(self, pipe, **parameters):
+        '''Return an iterator that decodes data from pipe using the current encoding.'''
+        decoder = self.codec.incrementaldecoder(**parameters)
+
+        # keep processing bytes and feeding them to our decoder. if the pipe
+        # is closed during this process, then that's ok and we can just leave.
+        bytereader = iter(functools.partial(pipe.read, 1), b'')
+        while not pipe.closed:
+            result = decoder.decode(next(bytereader))
+            if result:
+                yield result
+            continue
+        return
+
     def __start_monitoring(self, stdout, stderr=None):
         '''Start monitoring threads. **used internally**'''
         name = "thread-{:x}".format(self.program.pid)
 
-        def pipe_reader(pipe):
-            bytereader = iter(functools.partial(pipe.read, 1), b'')
-            reader = codecs.iterdecode(bytereader, self.encoding, errors='replace')
-            while not pipe.closed:
-                yield next(reader)
-            return
-
         ## create monitoring threads (coroutines)
+        params = dict(errors='replace')
         if stderr:
-            res = process.monitorGenerator(self.taskQueue, (stdout, pipe_reader(self.program.stdout)), (stderr, pipe_reader(self.program.stderr)), name=name)
+            out_pair = stdout, self.__make_reader(self.program.stdout, **params)
+            err_pair = stderr, self.__make_reader(self.program.stderr, **params)
+            res = process.monitorGenerator(self.taskQueue, out_pair, err_pair, name=name)
         else:
-            res = process.monitorGenerator(self.taskQueue, (stdout, pipe_reader(self.program.stdout)), name=name)
+            out_pair = stdout, self.__make_reader(self.program.stdout, **params)
+            res = process.monitorGenerator(self.taskQueue, out_pair, name=name)
 
         ## attach a friendly method that allows injection of data into the monitor
         res = list(res)
@@ -637,7 +650,8 @@ class process(object):
         '''Write `data` directly to program's stdin.'''
         if self.running and not self.program.stdin.closed:
             if self.updater and self.updater.is_alive():
-                return self.program.stdin.write(data.encode(self.encoding))
+                encoded, count = self.codec.encode(data)
+                return self.program.stdin.write(encoded)
             raise IOError("Unable to write to stdin for process {:d}. Updater thread has prematurely terminated.".format(self.id))
         raise IOError("Unable to write to stdin for process. {:s}.".format(self.__format_process_state()))
 
