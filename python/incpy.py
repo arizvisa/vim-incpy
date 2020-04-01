@@ -1,4 +1,4 @@
-import six, sys, logging
+import six, sys, logging, functools, codecs
 logger = logging.getLogger('incpy').getChild('py')
 
 try:
@@ -365,7 +365,6 @@ class process(object):
         env<dict> = os.environ -- environment to execute program with
         cwd<str> = os.getcwd() -- directory to execute program  in
         shell<bool> = True -- whether to treat program as an argument to a shell, or a path to an executable
-        newlines<bool> = True -- allow python to tamper with i/o to convert newlines
         show<bool> = False -- if within a windowed environment, open up a console for the process.
         paused<bool> = False -- if enabled, then don't start the process until .start() is called
         timeout<float> = -1 -- if positive, then raise a Asynchronous.Empty exception at the specified interval.
@@ -378,6 +377,7 @@ class process(object):
         args = shlex.split(command) if isinstance(command, six.string_types) else command[:]
         command = args.pop(0)
         self.command = command, args[:]
+        self.encoding = kwds.get('encoding', sys.getdefaultencoding())
 
         self.eventWorking = Asynchronous.Event()
         self.__taskQueue = Asynchronous.Queue()
@@ -402,12 +402,11 @@ class process(object):
 
         env = kwds.get('env', os.environ)
         cwd = kwds.get('cwd', os.getcwd())
-        newlines = kwds.get('newlines', True)
         shell = kwds.get('shell', False)
         stdout, stderr = options.pop('stdout', self.stdout), options.pop('stderr', self.stderr)
 
         ## spawn our subprocess using our new outputs
-        self.program = process.subprocess([self.command[0]] + self.command[1], cwd, env, newlines, joined=(stderr is None) or stdout == stderr, shell=shell, show=kwds.get('show', False))
+        self.program = process.subprocess([self.command[0]] + self.command[1], cwd, env, joined=(stderr is None) or stdout == stderr, shell=shell, show=kwds.get('show', False))
         self.eventWorking.clear()
 
         ## monitor program's i/o
@@ -471,11 +470,18 @@ class process(object):
         '''Start monitoring threads. **used internally**'''
         name = "thread-{:x}".format(self.program.pid)
 
+        def pipe_reader(pipe):
+            bytereader = iter(functools.partial(pipe.read, 1), b'')
+            reader = codecs.iterdecode(bytereader, self.encoding, errors='replace')
+            while not pipe.closed:
+                yield next(reader)
+            return
+
         ## create monitoring threads (coroutines)
         if stderr:
-            res = process.monitorPipe(self.taskQueue, (stdout, self.program.stdout), (stderr, self.program.stderr), name=name)
+            res = process.monitorGenerator(self.taskQueue, (stdout, pipe_reader(self.program.stdout)), (stderr, pipe_reader(self.program.stderr)), name=name)
         else:
-            res = process.monitorPipe(self.taskQueue, (stdout, self.program.stdout), name=name)
+            res = process.monitorGenerator(self.taskQueue, (stdout, pipe_reader(self.program.stdout)), name=name)
 
         ## attach a friendly method that allows injection of data into the monitor
         res = list(res)
@@ -489,12 +495,13 @@ class process(object):
         for t in threads: t.start()
 
     @staticmethod
-    def subprocess(program, cwd, environment, newlines, joined, shell=(os.name == 'nt'), show=False):
+    def subprocess(program, cwd, environment, joined, shell=(os.name == 'nt'), show=False):
         '''Create a subprocess using Asynchronous.spawn.'''
         stderr = Asynchronous.spawn_options.STDOUT if joined else Asynchronous.spawn_options.PIPE
 
         ## collect our default options for calling Asynchronous.spawn (subprocess.Popen)
-        options = dict(universal_newlines=newlines, stdin=Asynchronous.spawn_options.PIPE, stdout=Asynchronous.spawn_options.PIPE, stderr=stderr)
+        options = dict(stdin=Asynchronous.spawn_options.PIPE, stdout=Asynchronous.spawn_options.PIPE, stderr=stderr)
+        options.update(dict(universal_newlines=False) if sys.version_info.major < 3 else dict(text=False))
         if os.name == 'nt':
             options['startupinfo'] = si = Asynchronous.spawn_options.STARTUPINFO()
             si.dwFlags = Asynchronous.spawn_options.STARTF_USESHOWWINDOW
@@ -537,6 +544,26 @@ class process(object):
         return
 
     @staticmethod
+    def monitorGenerator(q, target, *more, **options):
+        """Attach a coroutine to a monitoring thread for stuffing queue `q` with data read from `target`.
+
+        The tuple `target` is composed of two values, `id` and `generator`.
+
+        Yields a list of (thread, coro) tuples given the arguments provided.
+        Each thread will consume `generator`, and stuff the result paired with `id` into `q`.
+        """
+        def stuff(q, *key):
+            while True:
+                item = (yield),
+                q.put(key + item)
+            return
+
+        for id, reader in  itertools.chain([target], more):
+            res, name = stuff(q, id), "{:s}<{!r}>".format(options.get('name', ''), id)
+            yield process.monitor_reader(six.next(res) or res.send, reader, name=name), res
+        return
+
+    @staticmethod
     def monitor(send, pipe, blocksize=1, daemon=True, name=None):
         """Spawn a thread that reads `blocksize` bytes from `pipe` and dispatches it to `send`
 
@@ -575,6 +602,31 @@ class process(object):
         truffle.daemon = daemon
         return truffle
 
+    @staticmethod
+    def monitor_reader(sender, reader, daemon=True, name=None):
+        """Spawn a thread that reads `blocksize` bytes from `pipe` and dispatches it to `send`
+
+        For every single byte, `send` is called. The thread is named according to
+        the `name` parameter.
+
+        Returns the monitoring Asynchronous.Thread instance
+        """
+
+        def shuffle(sender, reader):
+            for block in reader:
+                [ sender(item) for item in block ]
+            return
+
+        ## create our shuffling thread
+        if name:
+            truffle = Asynchronous.Thread(target=shuffle, name=name, args=(sender, reader))
+        else:
+            truffle = Asynchronous.Thread(target=shuffle, args=(sender, reader))
+
+        ## ..and set its daemonicity
+        truffle.daemon = daemon
+        return truffle
+
     def __format_process_state(self):
         if self.program is None:
             return "Process \"{!r}\" {:s}.".format(self.command[0], 'was never started')
@@ -585,7 +637,7 @@ class process(object):
         '''Write `data` directly to program's stdin.'''
         if self.running and not self.program.stdin.closed:
             if self.updater and self.updater.is_alive():
-                return self.program.stdin.write(data)
+                return self.program.stdin.write(data.encode(self.encoding))
             raise IOError("Unable to write to stdin for process {:d}. Updater thread has prematurely terminated.".format(self.id))
         raise IOError("Unable to write to stdin for process. {:s}.".format(self.__format_process_state()))
 
