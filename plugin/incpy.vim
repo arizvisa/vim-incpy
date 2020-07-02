@@ -430,7 +430,7 @@ class interpreter_python_internal(__incpy__.interpreter):
             echoformat = __incpy__.vim.gvars['incpy#EchoFormat']
             echo = '\n'.join(map(echoformat.format, data.split('\n')))
             echo = inputformat.format(echo)
-            self.view.write(echo)
+            self.write(echo)
         __incpy__.six.exec_(data, __incpy__.builtin.globals())
 
     def start(self):
@@ -481,7 +481,7 @@ class interpreter_external(__incpy__.interpreter):
             echoformat = __incpy__.vim.gvars['incpy#EchoFormat']
             echo = echoformat.format(data)
             echo = inputformat.format(data)
-            self.view.write(echo)
+            self.write(echo)
         input = inputformat.format(data)
         self.instance.write(input)
 
@@ -523,9 +523,10 @@ class internal(object):
 
     class buffer(object):
         """Internal vim commands for getting information about a buffer"""
-        name = __incpy__.builtin.staticmethod(lambda id: __incpy__.builtin.str(__incpy__.vim.eval("bufname({:d})".format(id))))
-        number = __incpy__.builtin.staticmethod(lambda id: __incpy__.builtin.int(__incpy__.vim.eval("bufnr({:d})".format(id))))
-        window = __incpy__.builtin.staticmethod(lambda id: __incpy__.builtin.int(__incpy__.vim.eval("bufwinnr({:d})".format(id))))
+        name = __incpy__.builtin.staticmethod(lambda id: __incpy__.builtin.str(__incpy__.vim.eval("bufname({!s})".format(id))))
+        number = __incpy__.builtin.staticmethod(lambda id: __incpy__.builtin.int(__incpy__.vim.eval("bufnr({!s})".format(id))))
+        window = __incpy__.builtin.staticmethod(lambda id: __incpy__.builtin.int(__incpy__.vim.eval("bufwinnr({!s})".format(id))))
+        exists = __incpy__.builtin.staticmethod(lambda id: __incpy__.builtin.bool(__incpy__.vim.eval("bufexists({!s})".format(id))))
 
     class window(object):
         """Internal vim commands for doing things with a window"""
