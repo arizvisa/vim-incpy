@@ -211,8 +211,8 @@ try:
             return cls(buf)
 
         # properties
-        name = property(fget=lambda s:s.buffer.name)
-        number = property(fget=lambda s:s.buffer.number)
+        name = property(fget=lambda self: self.buffer.name)
+        number = property(fget=lambda self: self.buffer.number)
 
         def __repr__(self):
             return "<incpy.buffer {:d} \"{:s}\">".format(self.number, self.name)
