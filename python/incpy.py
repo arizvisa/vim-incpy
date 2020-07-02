@@ -131,9 +131,9 @@ try:
             return n
 
         # error class
-        _error = _vim.error
-        class error(exceptions.Exception):
-            """because vim is using old-style exceptions based on str"""
+        _error = getattr(_vim, 'error', exceptions.Exception)
+        class error(_error if issubclass(_error, exceptions.Exception) else exceptions.Exception):
+            """An exception originating from vim's python implementation."""
 
         # buffer/window
         buffers = _accessor(_vim.buffers)
