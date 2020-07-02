@@ -204,19 +204,20 @@ try:
         # creating a buffer from various input
         @classmethod
         def new(cls, name):
-            """Create a new incpy.buffer object named /name/"""
+            """Create a new incpy.buffer object named `name`."""
             vim.command("silent! badd {:s}".format(name))
             buf = cls.search_name(name)
             return cls(buf)
+
         @classmethod
-        def from_id(cls, id):
-            """Return an incpy.buffer object from a buffer id"""
-            buf = cls.search_id(id)
-            return cls(buf)
-        @classmethod
-        def from_name(cls, name):
-            """Return an incpy.buffer object from a buffer name"""
-            buf = cls.search_name(name)
+        def of(cls, identity):
+            """Return an incpy.buffer object with the specified `identity` which can be either a name or id number."""
+            if isinstance(identity, six.string_types):
+                buf = cls.search_name(identity)
+            elif isinstance(identity, six.integer_types):
+                buf = cls.search_id(identity)
+            else:
+                raise vim.error("Unable to determine buffer from parameter type : {!s}".format(identity))
             return cls(buf)
 
         # properties

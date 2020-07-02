@@ -643,9 +643,9 @@ class view(object):
     def __get_buffer(self, target):
         six, builtin = __incpy__.six, __incpy__.builtin
         if builtin.isinstance(target, six.integer_types):
-            return __incpy__.buffer.from_id(target)
+            return __incpy__.buffer.of(target)
         elif builtin.isinstance(target, six.string_types):
-            try: return __incpy__.buffer.from_name(target)
+            try: return __incpy__.buffer.of(target)
             except: return __incpy__.buffer.new(target)
         raise __incpy__.incpy.vim.error("Unable to determine output buffer from parameter : {!r}".format(target))
 
