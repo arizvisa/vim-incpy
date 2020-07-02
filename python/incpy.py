@@ -188,16 +188,25 @@ try:
                 raise AssertionError
             self.buffer = buffer
             #self.writing = threading.Lock()
+
+        def close(cls):
+            # if vim is going down, then it will crash trying to do anything
+            # with python...so if it is, don't try to clean up.
+            if vim.vvars['dying']:
+                return
+            vim.command("silent! bdelete! {:d}".format(self.buffer.number))
+
         def __del__(self):
             if sys.version_info.major >= 3:
                 return
-            self.__destroy(self.buffer)
+            return self.close()
 
         # creating a buffer from various input
         @classmethod
         def new(cls, name):
             """Create a new incpy.buffer object named /name/"""
-            buf = cls.__create(name)
+            vim.command("silent! badd {:s}".format(name))
+            buf = cls.search_name(name)
             return cls(buf)
         @classmethod
         def from_id(cls, id):
@@ -216,18 +225,6 @@ try:
 
         def __repr__(self):
             return "<incpy.buffer {:d} \"{:s}\">".format(self.number, self.name)
-
-        ## class methods for helping with vim buffer scope
-        @classmethod
-        def __create(cls, name):
-            vim.command("silent! badd {:s}".format(name))
-            return cls.search_name(name)
-        @classmethod
-        def __destroy(cls, buffer):
-            # if vim is going down, then it will crash trying to do anything
-            # with python...so if it is, don't try to clean up.
-            if vim.vvars['dying']: return
-            vim.command("silent! bdelete! {:d}".format(buffer.number))
 
         ## searching buffers
         @staticmethod
