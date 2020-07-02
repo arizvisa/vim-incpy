@@ -592,12 +592,11 @@ class internal(object):
             return res
         @__incpy__.builtin.classmethod
         def hide(cls, bufferid, preview=False):
-            last = cls.select( cls.buffer(bufferid) )
+            last = cls.select(cls.buffer(bufferid))
             if preview:
                 __incpy__.vim.command("noautocmd silent pclose!")
             else:
                 __incpy__.vim.command("noautocmd silent close!")
-            self.window = cls.buffer(bufferid)
             cls.select(last)
 
         # window state
@@ -635,11 +634,11 @@ class view(object):
 
         Buffer can be an existing id number, filename, or new name.
         """
-        self.buffer = self.__get_buffer(buffer)
         self.options = opt
         self.preview = preview
-        self.window = __incpy__.internal.window.buffer( self.buffer.number )
+
         # FIXME: creating a view in another tab is not supported yet
+        self.__buffer = self.__get_buffer(buffer)
 
     def __get_buffer(self, target):
         six, builtin = __incpy__.six, __incpy__.builtin
@@ -649,6 +648,15 @@ class view(object):
             try: return __incpy__.buffer.from_name(target)
             except: return __incpy__.buffer.new(target)
         raise __incpy__.incpy.vim.error("Unable to determine output buffer from parameter : {!r}".format(target))
+
+    @property
+    def buffer(self):
+        return self.__buffer
+
+    @property
+    def window(self):
+        buffer = self.buffer
+        return __incpy__.internal.window.buffer(buffer.number)
 
     def write(self, data):
         """Write data directly into window contents (updating buffer)"""
@@ -665,9 +673,7 @@ class view(object):
 
         current = __incpy__.internal.window.current()
         sz = __incpy__.internal.window.currentsize(position) * ratio
-        result = __incpy__.internal.window.create(buf.number, position, __incpy__.builtin.int(sz), self.options, preview=self.preview)
-        self.window = result
-        return result
+        return __incpy__.internal.window.create(buf.number, position, __incpy__.builtin.int(sz), self.options, preview=self.preview)
 
     def show(self, position):
         """Show window at the specified position"""
