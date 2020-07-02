@@ -32,9 +32,9 @@
 " emits will then be updated in the "Scratch" buffer.
 "
 " Mappings:
-" ! -- execute current selected row
-" <C-\> -- display `repr()` for symbol at cursor using `g:incpy#EvalFormat`.
-" <C-@> -- display `help()` for symbol at cursor using `g:incpy#HelpFormat`.
+" ! -- execute line at the current cursor position
+" <C-/>   -- display `repr()` for symbol at cursor using `g:incpy#EvalFormat`.
+" <C-S-@> -- display `help()` for symbol at cursor using `g:incpy#HelpFormat`.
 "
 " Installation:
 " Simply copy the root of this repository into your user's runtime directory.
@@ -289,10 +289,10 @@ function! incpy#SetupKeys()
     vnoremap ! :PyRange<C-M>
 
     " python-specific mappings
-    nnoremap <C-\> :call incpy#Evaluate(expand("<cexpr>"))<C-M>
-    vnoremap <C-\> :PyEvalRange<C-M>
-    nnoremap <C-@> :call incpy#Halp(expand("<cexpr>"))<C-M>
-    vnoremap <C-@> :PyHelpRange<C-M>
+    nnoremap <C-/> :call incpy#Evaluate(expand("<cexpr>"))<C-M>
+    vnoremap <C-/> :PyEvalRange<C-M>
+    nnoremap <C-S-@> :call incpy#Halp(expand("<cexpr>"))<C-M>
+    vnoremap <C-S-@> :PyHelpRange<C-M>
 endfunction
 
 "" Define the whole python interface for the plugin
