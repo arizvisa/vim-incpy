@@ -154,13 +154,26 @@ endfunction
 
 """ Window management
 function! s:windowselect(id)
-    " select the requested windowid, return the previous window id
+
+    " check if we were given a bunk window id
+    if a:id == -1
+        throw printf("Invalid window identifier %d", a:id)
+    endif
+
+    " select the requested window id, return the previous window id
     let current = winnr()
     execute printf("%d wincmd w", a:id)
     return current
 endfunction
 
 function! s:windowtail(bufid)
+
+    " if we were given a bunk buffer id, then we need to bitch
+    " because we can't select it or anything
+    if a:bufid == -1
+        throw printf("Invalid buffer identifier %d", a:bufid)
+    endif
+
     " tail the window that's using the specified buffer id
     let last = s:windowselect(bufwinnr(a:bufid))
     if winnr() == bufwinnr(a:bufid)
@@ -776,7 +789,7 @@ endfunction
 function! incpy#Execute(line)
     execute printf("pythonx __incpy__.cache.communicate('%s')", escape(a:line, "'\\"))
     if g:incpy#OutputFollow
-        call s:windowtail(g:incpy#BufferId)
+        try | call s:windowtail(g:incpy#BufferId) | catch /^Invalid/ | endtry
     endif
 endfunction
 
@@ -796,7 +809,7 @@ function! incpy#Range(begin, end)
 
     " If the user configured us to follow the output, then do as we were told.
     if g:incpy#OutputFollow
-        call s:windowtail(g:incpy#BufferId)
+        try | call s:windowtail(g:incpy#BufferId) | catch /^Invalid/ | endtry
     endif
 endfunction
 
@@ -805,7 +818,7 @@ function! incpy#Evaluate(expr)
     execute printf("pythonx __incpy__.cache.communicate(\"%s\".format(\"%s\"))", s:singleline(g:incpy#EvalFormat, "\"\\"), escape(a:expr, "\"\\"))
 
     if g:incpy#OutputFollow
-        call s:windowtail(g:incpy#BufferId)
+        try | call s:windowtail(g:incpy#BufferId) | catch /^Invalid/ | endtry
     endif
 endfunction
 
