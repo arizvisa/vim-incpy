@@ -214,6 +214,13 @@ try:
         @classmethod
         def of(cls, identity):
             """Return an incpy.buffer object with the specified `identity` which can be either a name or id number."""
+
+            # If we were already given a vim.buffer instance, then there's
+            # really nothing for us to actually do.
+            if isinstance(identity, _vim.Buffer):
+                return cls(identity)
+
+            # Create some matcher callables that we can search with
             def match_name(buffer):
                 return buffer.name is not None and buffer.name.endswith(identity)
             def match_id(buffer):
