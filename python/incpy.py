@@ -228,13 +228,17 @@ try:
 
             # Figure out which matcher type we need to use based on the type
             if isinstance(identity, six.string_types):
-                match = match_name
+                res, match = "\"{:s}\"".format(identity), match_name
 
             elif isinstance(identity, six.integer_types):
-                match = match_id
+                res, match = "{:d}".format(identity), match_id
 
             else:
                 raise vim.error("Unable to determine buffer from parameter type : {!s}".format(identity))
+
+            # If we iterated through everything, then we didn't find a match
+            if not vim.eval("bufexists({!s})".format(res)):
+                raise vim.error("Unable to find buffer from parameter : {!s}".format(identity))
 
             # Iterate through all our buffers finding the first one that matches
             try:
