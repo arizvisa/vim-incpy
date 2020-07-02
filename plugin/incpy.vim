@@ -632,26 +632,33 @@ class view(object):
     def __init__(self, buffer, opt, preview, tab=None):
         """Create a view for the specified buffer.
 
-        Buffer can be an existing id number, filename, or new name.
+        Buffer can be an existing buffer, an id number, filename, or even a new name.
         """
         self.options = opt
         self.preview = preview
 
-        # FIXME: creating a view in another tab is not supported yet
-        self.__buffer = self.__get_buffer(buffer)
+        # Get the vim.buffer from the buffer the caller gave us.
+        try:
+            buf = __incpy__.buffer.of(buffer)
 
-    def __get_buffer(self, target):
-        six, builtin = __incpy__.six, __incpy__.builtin
-        if builtin.isinstance(target, six.integer_types):
-            return __incpy__.buffer.of(target)
-        elif builtin.isinstance(target, six.string_types):
-            try: return __incpy__.buffer.of(target)
-            except: return __incpy__.buffer.new(target)
-        raise __incpy__.incpy.vim.error("Unable to determine output buffer from parameter : {!r}".format(target))
+        # If we couldn't find the desired buffer, then we'll just create one
+        # with the name that we were given.
+        except Exception as E:
+            if not isinstance(buffer, __incpy__.six.string_types):
+                raise __incpy__.incpy.vim.error("Unable to determine output buffer name from parameter : {!r}".format(buffer))
+
+            # Create a buffer with the specified name. This is not really needed
+            # as we're only creating it to sneak off with the buffer's name.
+            buf = __incpy__.buffer.new(buffer)
+
+        # Now we can grab the buffer's name so that we can use it to re-create
+        # the buffer if it was deleted by the user.
+        self.__buffer_name = buf.name
 
     @property
     def buffer(self):
-        return self.__buffer
+        name = self.__buffer_name
+        return __incpy__.buffer.of(name)
 
     @property
     def window(self):
@@ -662,9 +669,13 @@ class view(object):
         """Write data directly into window contents (updating buffer)"""
         return self.buffer.write(data)
 
+    # Methods wrapping the window visibility and its scope
     def create(self, position, ratio):
         """Create window for buffer"""
         builtin = __incpy__.builtin
+
+        # FIXME: creating a view in another tab is not supported yet
+
         buf = self.buffer
         if __incpy__.internal.buffer.number(buf.number) == -1:
             raise builtin.Exception("Buffer {:d} does not exist".format(buf.number))
@@ -673,26 +684,34 @@ class view(object):
 
         current = __incpy__.internal.window.current()
         sz = __incpy__.internal.window.currentsize(position) * ratio
-        return __incpy__.internal.window.create(buf.number, position, __incpy__.builtin.int(sz), self.options, preview=self.preview)
+        return __incpy__.internal.window.create(buf.number, position, builtin.int(sz), self.options, preview=self.preview)
 
     def show(self, position):
         """Show window at the specified position"""
         builtin = __incpy__.builtin
+
+        # FIXME: showing a view in another tab is not supported yet
+
         buf = self.buffer
         if __incpy__.internal.buffer.number(buf.number) == -1:
             raise builtin.Exception("Buffer {:d} does not exist".format(buf.number))
         if __incpy__.internal.buffer.window(buf.number) != -1:
             raise builtin.Exception("Window for {:d} is already showing".format(buf.number))
+
         __incpy__.internal.window.show(buf.number, position, preview=self.preview)
 
     def hide(self):
         """Hide the window"""
         builtin = __incpy__.builtin
+
+        # FIXME: hiding a view in another tab is not supported yet
+
         buf = self.buffer
         if __incpy__.internal.buffer.number(buf.number) == -1:
             raise builtin.Exception("Buffer {:d} does not exist".format(buf.number))
         if __incpy__.internal.buffer.window(buf.number) == -1:
             raise builtin.Exception("Window for {:d} is already hidden".format(buf.number))
+
         __incpy__.internal.window.hide(buf.number, preview=self.preview)
 
     def __repr__(self):
