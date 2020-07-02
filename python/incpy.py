@@ -182,7 +182,8 @@ try:
     # fd-like wrapper around vim buffer object
     class buffer(object):
         """vim buffer management"""
-        ## instance scope
+
+        # Scope of the buffer instance
         def __init__(self, buffer):
             if type(buffer) != type(vim.current.buffer):
                 raise AssertionError
@@ -201,55 +202,61 @@ try:
                 return
             return self.close()
 
-        # creating a buffer from various input
+        # Creating a buffer from various inputs
         @classmethod
         def new(cls, name):
             """Create a new incpy.buffer object named `name`."""
             vim.command("silent! badd {:s}".format(name))
-            buf = cls.search_name(name)
-            return cls(buf)
+
+            # Now that the buffer has been added, we can try and fetch it by name
+            return cls.of(name)
 
         @classmethod
         def of(cls, identity):
             """Return an incpy.buffer object with the specified `identity` which can be either a name or id number."""
+            def match_name(buffer):
+                return buffer.name is not None and buffer.name.endswith(identity)
+            def match_id(buffer):
+                return buffer.number == identity
+
+            # Figure out which matcher type we need to use based on the type
             if isinstance(identity, six.string_types):
-                buf = cls.search_name(identity)
+                match = match_name
+
             elif isinstance(identity, six.integer_types):
-                buf = cls.search_id(identity)
+                match = match_id
+
             else:
                 raise vim.error("Unable to determine buffer from parameter type : {!s}".format(identity))
-            return cls(buf)
 
-        # properties
+            # Iterate through all our buffers finding the first one that matches
+            try:
+                # FIXME: It sucks that this is O(n), but what else can we do?
+                buf = next(buffer for buffer in vim.buffers if match(buffer))
+
+            # If we iterated through everything, then we didn't find a match
+            except StopIteration:
+                raise vim.error("Unable to find buffer from parameter : {!s}".format(identity))
+
+            # Now we can construct our class using the buffer we found
+            else:
+                return cls(buf)
+
+        # Properties
         name = property(fget=lambda self: self.buffer.name)
         number = property(fget=lambda self: self.buffer.number)
 
         def __repr__(self):
             return "<incpy.buffer {:d} \"{:s}\">".format(self.number, self.name)
 
-        ## searching buffers
-        @staticmethod
-        def search_name(name):
-            for b in vim.buffers:
-                if b.name is not None and b.name.endswith(name):
-                    return b
-                continue
-            raise vim.error("unable to find buffer '{:s}'".format(name))
-        @staticmethod
-        def search_id(number):
-            for b in vim.buffers:
-                if b.number == number:
-                    return b
-                continue
-            raise vim.error("unable to find buffer {:d}".format(number))
-
-        ## editing buffer
+        # Editing buffer the buffer in-place
         def write(self, data):
             result = iter(data.split('\n'))
             self.buffer[-1] += six.next(result)
             [ self.buffer.append(item) for item in result ]
 
-        def clear(self): self.buffer[:] = ['']
+        def clear(self):
+            self.buffer[:] = ['']
 
 except ImportError:
     logger.warning('unable to import the vim module for python-vim. skipping the definition of its wrappers.')
