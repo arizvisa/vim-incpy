@@ -350,11 +350,6 @@ class interpreter(object):
         kwds.setdefault('tab', __incpy__.internal.tab.getCurrent())
         self.view = __incpy__.view(kwds.pop('buffer', None) or __incpy__.vim.gvars['incpy#WindowName'], opt, **kwds)
 
-    def __del__(self):
-        if __incpy__.sys.version_info.major >= 3:
-            return
-        return self.detach()
-
     def write(self, data):
         """Writes data directly into view"""
         return self.view.write(data)

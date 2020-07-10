@@ -197,11 +197,6 @@ try:
                 return
             vim.command("silent! bdelete! {:d}".format(self.buffer.number))
 
-        def __del__(self):
-            if sys.version_info.major >= 3:
-                return
-            return self.close()
-
         # Creating a buffer from various inputs
         @classmethod
         def new(cls, name):
