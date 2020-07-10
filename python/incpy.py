@@ -142,14 +142,14 @@ try:
         # vim.command and evaluation (local + remote)
         if (_vim.eval('has("clientserver")')) and False:
             @classmethod
-            def command(cls, string):
-                cmd,escape = string.replace('"', r'\"'), ''*16
-                return _vim.command("call remote_send(v:servername, \"{:s}:{:s}\n\")".format(escape,cmd))
+            def command(cls, string, count=16):
+                cmd, escape = string.replace("'", "''"), ''
+                return _vim.command("call remote_send(v:servername, \"{:s}:\" . '{:s}' . \"\n\")".format(count * escape, cmd))
 
             @classmethod
             def eval(cls, string):
-                cmd = string.replace('"', r'\"')
-                return cls._from(_vim.eval("remote_expr(v:servername, \"{:s}\")".format(cmd)))
+                cmd = string.replace("'", "''")
+                return cls._from(_vim.eval("remote_expr(v:servername, '{:s}')".format(cmd)))
 
         else:
             @classmethod
@@ -223,7 +223,7 @@ try:
 
             # Figure out which matcher type we need to use based on the type
             if isinstance(identity, six.string_types):
-                res, match = "\"{:s}\"".format(identity), match_name
+                res, match = "'{:s}'".format(identity.replace("'", "''")), match_name
 
             elif isinstance(identity, six.integer_types):
                 res, match = "{:d}".format(identity), match_id

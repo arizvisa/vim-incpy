@@ -691,7 +691,8 @@ class view(object):
 
         # Now we can grab the buffer's name so that we can use it to re-create
         # the buffer if it was deleted by the user.
-        self.__buffer_name = buf.name
+        res = "'{!s}'".format(buf.name.replace("'", "''"))
+        self.__buffer_name = __incpy__.vim.eval("fnamemodify({:s}, \":.\")".format(res))
 
     @property
     def buffer(self):
