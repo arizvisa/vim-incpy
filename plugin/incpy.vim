@@ -32,9 +32,9 @@
 " emits will then be updated in the "Scratch" buffer.
 "
 " Mappings:
-" ! -- execute line at the current cursor position
-" <C-/>   -- display `repr()` for symbol at cursor using `g:incpy#EvalFormat`.
-" <C-S-@> -- display `help()` for symbol at cursor using `g:incpy#HelpFormat`.
+" !              -- execute line at the current cursor position
+" <C-/> or <C-\> -- display `repr()` for symbol at cursor using `g:incpy#EvalFormat`.
+" <C-S-@>        -- display `help()` for symbol at cursor using `g:incpy#HelpFormat`.
 "
 " Installation:
 " Simply copy the root of this repository into your user's runtime directory.
@@ -296,15 +296,24 @@ function! incpy#SetupCommands()
     command -range PyHelpRange <line1>,<line2>call incpy#Halp(s:selected())
 endfunction
 
+function! s:word_under_cursor()
+    let res = expand("<cexpr>")
+    return len(res)? res : expand("<cword>")
+endfunction
+
 function! incpy#SetupKeys()
     " Set up the default key mappings for vim to use the plugin
     nnoremap ! :PyLine<C-M>
     vnoremap ! :PyRange<C-M>
 
-    " python-specific mappings
-    nnoremap <C-/> :call incpy#Evaluate(expand("<cexpr>"))<C-M>
+    " Python visual and normal mode mappings
+    nnoremap <C-/> :call incpy#Evaluate(<SID>word_under_cursor())<C-M>
     vnoremap <C-/> :PyEvalRange<C-M>
-    nnoremap <C-S-@> :call incpy#Halp(expand("<cexpr>"))<C-M>
+
+    nnoremap <C-\> :call incpy#Evaluate(<SID>word_under_cursor())<C-M>
+    vnoremap <C-\> :PyEvalRange<C-M>
+
+    nnoremap <C-S-@> :call incpy#Halp(<SID>word_under_cursor())<C-M>
     vnoremap <C-S-@> :PyHelpRange<C-M>
 endfunction
 
