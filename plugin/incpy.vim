@@ -724,12 +724,13 @@ class view(object):
 
     @property
     def window(self):
-        buffer = self.buffer
-        return __incpy__.internal.window.buffer(buffer.number)
+        result = self.buffer
+        return __incpy__.internal.window.buffer(result.number)
 
     def write(self, data):
         """Write data directly into window contents (updating buffer)"""
-        return self.buffer.write(data)
+        result = self.buffer
+        return result.write(data)
 
     # Methods wrapping the window visibility and its scope
     def create(self, position, ratio):
@@ -737,44 +738,44 @@ class view(object):
         builtin = __incpy__.builtin
 
         # FIXME: creating a view in another tab is not supported yet
+        result = self.buffer
 
-        buf = self.buffer
-        if __incpy__.internal.buffer.number(buf.number) == -1:
-            raise builtin.Exception("Buffer {:d} does not exist".format(buf.number))
+        if __incpy__.internal.buffer.number(result.number) == -1:
+            raise builtin.Exception("Buffer {:d} does not exist".format(result.number))
         if 1.0 <= ratio < 0.0:
             raise builtin.Exception("Specified ratio is out of bounds {!r}".format(ratio))
 
         current = __incpy__.internal.window.current()
         sz = __incpy__.internal.window.currentsize(position) * ratio
-        return __incpy__.internal.window.create(buf.number, position, builtin.int(sz), self.options, preview=self.preview)
+        return __incpy__.internal.window.create(result.number, position, builtin.int(sz), self.options, preview=self.preview)
 
     def show(self, position):
         """Show window at the specified position"""
         builtin = __incpy__.builtin
 
         # FIXME: showing a view in another tab is not supported yet
+        result = self.buffer
 
-        buf = self.buffer
-        if __incpy__.internal.buffer.number(buf.number) == -1:
-            raise builtin.Exception("Buffer {:d} does not exist".format(buf.number))
-        if __incpy__.internal.buffer.window(buf.number) != -1:
-            raise builtin.Exception("Window for {:d} is already showing".format(buf.number))
+        if __incpy__.internal.buffer.number(result.number) == -1:
+            raise builtin.Exception("Buffer {:d} does not exist".format(result.number))
+        if __incpy__.internal.buffer.window(result.number) != -1:
+            raise builtin.Exception("Window for {:d} is already showing".format(result.number))
 
-        __incpy__.internal.window.show(buf.number, position, preview=self.preview)
+        return __incpy__.internal.window.show(result.number, position, preview=self.preview)
 
     def hide(self):
         """Hide the window"""
         builtin = __incpy__.builtin
 
         # FIXME: hiding a view in another tab is not supported yet
+        result = self.buffer
 
-        buf = self.buffer
-        if __incpy__.internal.buffer.number(buf.number) == -1:
-            raise builtin.Exception("Buffer {:d} does not exist".format(buf.number))
-        if __incpy__.internal.buffer.window(buf.number) == -1:
-            raise builtin.Exception("Window for {:d} is already hidden".format(buf.number))
+        if __incpy__.internal.buffer.number(result.number) == -1:
+            raise builtin.Exception("Buffer {:d} does not exist".format(result.number))
+        if __incpy__.internal.buffer.window(result.number) == -1:
+            raise builtin.Exception("Window for {:d} is already hidden".format(result.number))
 
-        __incpy__.internal.window.hide(buf.number, preview=self.preview)
+        return __incpy__.internal.window.hide(result.number, preview=self.preview)
 
     def __repr__(self):
         identity = "\"{:s}\"".format(self.buffer.name) if __incpy__.buffer.exists(self.__buffer_name) else "(missing) \"{:s}\"".format(self.__buffer_name)
