@@ -709,17 +709,18 @@ class view(object):
 
         # Find the buffer by the name that was previously cached.
         try:
-            buf = __incpy__.buffer.of(name)
+            result = __incpy__.buffer.of(name)
 
-        # If we got an exception, then we need to re-create the buffer that's
-        # being requested. Log the exception first, and then create the buffer.
+        # If we got an exception when trying to snag the buffer by its name, then
+        # log the exception and create a new one to take the old one's place.
         except __incpy__.incpy.vim.error as E:
-            __incpy__.logger.warning("recreating output buffer due to exception : {!s}".format(E), exc_info=True)
-            return __incpy__.buffer.new(name)
+            __incpy__.logger.info("recreating output buffer due to exception : {!s}".format(E), exc_info=True)
+
+            # Create a new buffer using the name that we expect it to have.
+            result = __incpy__.buffer.new(name)
 
         # Return the buffer we found back to the caller.
-        else:
-            return buf
+        return result
 
     @property
     def window(self):
