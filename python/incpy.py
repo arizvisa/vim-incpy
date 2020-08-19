@@ -207,6 +207,35 @@ try:
             return cls.of(name)
 
         @classmethod
+        def exists(cls, identity):
+            '''Return a boolean on whether a buffer of the specified `identity` exists.'''
+
+            # If we got a vim.buffer, then it exists because the user
+            # has given us a reference ot it.
+            if isinstance(identity, _vim.Buffer):
+                return True
+
+            # Create some closures that we can use to verify the buffer
+            # matches what the user asked for.
+            def match_name(buffer):
+                return buffer.name is not None and buffer.name.endswith(identity)
+            def match_id(buffer):
+                return buffer.number == identity
+
+            # Figure out which closure we need to use based on the parameter type
+            if isinstance(identity, six.string_types):
+                res, match = "'{:s}'".format(identity.replace("'", "''")), match_name
+
+            elif isinstance(identity, six.integer_types):
+                res, match = "{:d}".format(identity), match_id
+
+            else:
+                raise vim.error("Unable to identify buffer due to invalid parameter type : {!s}".format(identity))
+
+            # Now we just need to ask vim if the buffer exists and return it
+            return bool(vim.eval("bufexists({!s})".format(res)))
+
+        @classmethod
         def of(cls, identity):
             """Return an incpy.buffer object with the specified `identity` which can be either a name or id number."""
 
