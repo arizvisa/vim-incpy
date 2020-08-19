@@ -711,10 +711,10 @@ class view(object):
         try:
             buf = __incpy__.buffer.of(name)
 
-        # If we got an exception, then log it and re-create the buffer so that
-        # it can still be used.
+        # If we got an exception, then we need to re-create the buffer that's
+        # being requested. Log the exception first, and then create the buffer.
         except __incpy__.incpy.vim.error as E:
-            __incpy__.logger.warning("recreating output buffer due to exception : {!s}".format(E))
+            __incpy__.logger.warning("recreating output buffer due to exception : {!s}".format(E), exc_info=True)
             return __incpy__.buffer.new(name)
 
         # Return the buffer we found back to the caller.
@@ -776,9 +776,10 @@ class view(object):
         __incpy__.internal.window.hide(buf.number, preview=self.preview)
 
     def __repr__(self):
+        identity = "\"{:s}\"".format(self.buffer.name) if __incpy__.buffer.exists(self.__buffer_name) else "(missing) \"{:s}\"".format(self.__buffer_name)
         if self.preview:
-            return "<__incpy__.view buffer:{:d} \"{:s}\" preview>".format(self.window, self.buffer.name)
-        return "<__incpy__.view buffer:{:d} \"{:s}\">".format(self.window, self.buffer.name)
+            return "<__incpy__.view buffer:{:d} {:s} preview>".format(self.window, identity)
+        return "<__incpy__.view buffer:{:d} {:s}>".format(self.window, identity)
 __incpy__.view = view; del(view)
 
 # spawn interpreter requested by user
