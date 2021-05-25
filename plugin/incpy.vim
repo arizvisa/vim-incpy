@@ -313,6 +313,11 @@ function! incpy#SetupKeys()
     nnoremap <C-\> :call incpy#Evaluate(<SID>word_under_cursor())<C-M>
     vnoremap <C-\> :PyEvalRange<C-M>
 
+    " Normal and visual mode mappings for windows
+    nnoremap <C-@> :call incpy#Halp(<SID>word_under_cursor())<C-M>
+    vnoremap <C-@> :PyHelpRange<C-M>
+
+    " Normal and visual mode mappings for everything else
     nnoremap <C-S-@> :call incpy#Halp(<SID>word_under_cursor())<C-M>
     vnoremap <C-S-@> :PyHelpRange<C-M>
 endfunction
