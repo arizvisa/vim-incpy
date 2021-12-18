@@ -187,7 +187,7 @@ function! s:windowtail(bufid)
 
         let tc = tabpagenr()
         for tn in range(tabpagenr('$'))
-            if index(tabpagebuflist(tn+1), a:bufid) > -1
+            if index(tabpagebuflist(1 + tn), a:bufid) > -1
                 execute printf("tabnext %d", tn)
                 let tl = s:windowselect(bufwinnr(a:bufid))
                 keepjumps noautocmd normal gg
@@ -349,17 +349,17 @@ __incpy__.logger = __import__('logging').getLogger('incpy').getChild('vim')
 # interpreter classes
 class interpreter(object):
     # options that are used for constructing the view
-    view_options = ('buffer','opt','preview','tab')
+    view_options = ['buffer', 'opt', 'preview', 'tab']
 
     @__incpy__.builtin.classmethod
     def new(cls, **options):
         options.setdefault('buffer', None)
-        return cls(**options)
+        return cls(**options).startup()
 
     def __init__(self, **kwds):
         opt = {}.__class__(__incpy__.vim.gvars['incpy#CoreWindowOptions'])
         opt.update(__incpy__.vim.gvars['incpy#WindowOptions'])
-        opt.update(kwds.pop('opt',{}))
+        opt.update(kwds.pop('opt', {}))
         kwds.setdefault('preview', __incpy__.vim.gvars['incpy#WindowPreview'])
         kwds.setdefault('tab', __incpy__.internal.tab.getCurrent())
         self.view = __incpy__.view(kwds.pop('buffer', None) or __incpy__.vim.gvars['incpy#WindowName'], opt, **kwds)
@@ -384,6 +384,10 @@ class interpreter(object):
     def communicate(self, command, silent=False):
         """Sends commands to interpreter"""
         raise __incpy__.builtin.NotImplementedError
+
+    def startup(self):
+        """Initialize the recently started interpreter"""
+        return self
 
     def start(self):
         """Starts the interpreter"""
@@ -445,6 +449,12 @@ class interpreter_python_internal(__incpy__.interpreter):
     def start(self):
         __incpy__.logger.warning("internal interpreter has already been (implicitly) started")
 
+    def startup(self):
+        boolean = "'PYTHONSTARTUP' in __import__('os').environ"
+        execute = "exec(open(__import__('os').environ['PYTHONSTARTUP'], 'rt').read())"
+        self.communicate(' and '.join([boolean, execute]), silent=True)
+        return self
+
     def stop(self):
         __incpy__.logger.fatal("unable to stop internal interpreter as it is always running")
 __incpy__.interpreter_python_internal = interpreter_python_internal; del(interpreter_python_internal)
@@ -455,9 +465,9 @@ class interpreter_external(__incpy__.interpreter):
 
     @__incpy__.builtin.classmethod
     def new(cls, command, **options):
-        res = cls(**options)
+        res = cls(**options).startup()
         [ options.pop(item, None) for item in cls.view_options ]
-        res.command,res.options = command,options
+        res.command, res.options = command, options
         return res
 
     def attach(self):
@@ -465,7 +475,7 @@ class interpreter_external(__incpy__.interpreter):
 
         logger.debug("connecting i/o from {!r} to {!r}".format(self.command, self.view))
         self.instance = __incpy__.spawn(self.view.write, self.command, **self.options)
-        logger.info("started process {:d} ({:#x}): {:s}".format(self.instance.id,self.instance.id,self.command))
+        logger.info("started process {:d} ({:#x}): {:s}".format(self.instance.id, self.instance.id, self.command))
 
         self.state = logger,
 
@@ -481,7 +491,7 @@ class interpreter_external(__incpy__.interpreter):
         logger.info("killing process {!r}".format(self.instance))
         self.instance.stop()
 
-        logger.debug("disconnecting i/o for {!r} from {!r}".format(self.instance,self.view))
+        logger.debug("disconnecting i/o for {!r} from {!r}".format(self.instance, self.view))
         self.instance = None
 
     def communicate(self, data, silent=False):
@@ -515,12 +525,12 @@ class internal(object):
 
     class tab(object):
         """Internal vim commands for interacting with tabs"""
-        goto = __incpy__.builtin.staticmethod(lambda n: __incpy__.vim.command("tabnext {:d}".format(n+1)))
-        close = __incpy__.builtin.staticmethod(lambda n: __incpy__.vim.command("tabclose {:d}".format(n+1)))
+        goto = __incpy__.builtin.staticmethod(lambda n: __incpy__.vim.command("tabnext {:d}".format(1 + n)))
+        close = __incpy__.builtin.staticmethod(lambda n: __incpy__.vim.command("tabclose {:d}".format(1 + n)))
         #def move(n, t):    # FIXME
         #    current = int(__incpy__.vim.eval('tabpagenr()'))
-        #    _ = t if current == n else current if t > current else current+1
-        #    __incpy__.vim.command("tabnext {:d} | tabmove {:d} | tabnext {:d}".format(n+1,t,_))
+        #    _ = t if current == n else current if t > current else current + 1
+        #    __incpy__.vim.command("tabnext {:d} | tabmove {:d} | tabnext {:d}".format(1 + n, t, _))
 
         getCurrent = __incpy__.builtin.staticmethod(lambda: __incpy__.builtin.int(__incpy__.vim.eval('tabpagenr()')) - 1)
         getCount = __incpy__.builtin.staticmethod(lambda: __incpy__.builtin.int(__incpy__.vim.eval('tabpagenr("$")')))
@@ -543,17 +553,17 @@ class internal(object):
         # ui position conversion
         @__incpy__.builtin.staticmethod
         def positionToLocation(position):
-            if position in ('left','above'):
+            if position in {'left', 'above'}:
                 return 'leftabove'
-            if position in ('right','below'):
+            if position in {'right', 'below'}:
                 return 'rightbelow'
             raise __incpy__.builtin.ValueError(position)
 
         @__incpy__.builtin.staticmethod
         def positionToSplit(position):
-            if position in ('left','right'):
+            if position in {'left', 'right'}:
                 return 'vsplit'
-            if position in ('above','below'):
+            if position in {'above', 'below'}:
                 return 'split'
             raise __incpy__.builtin.ValueError(position)
 
@@ -563,13 +573,13 @@ class internal(object):
             result = []
             for k, v in __incpy__.six.iteritems(options):
                 if builtin.isinstance(v, __incpy__.six.string_types):
-                    result.append("{:s}={:s}".format(k,v))
+                    result.append("{:s}={:s}".format(k, v))
                 elif builtin.isinstance(v, builtin.bool):
                     result.append("{:s}{:s}".format('' if v else 'no', k))
                 elif builtin.isinstance(v, __incpy__.six.integer_types):
-                    result.append("{:s}={:d}".format(k,v))
+                    result.append("{:s}={:d}".format(k, v))
                 else:
-                    raise NotImplementedError(k,v)
+                    raise NotImplementedError(k, v)
                 continue
             return '\\ '.join(result)
 
@@ -791,7 +801,7 @@ __incpy__.view = view; del(view)
 
 # spawn interpreter requested by user
 _ = __incpy__.vim.gvars["incpy#Program"]
-opt = {'winfixwidth':True,'winfixheight':True} if __incpy__.vim.gvars["incpy#WindowFixed"] > 0 else {}
+opt = {'winfixwidth':True, 'winfixheight':True} if __incpy__.vim.gvars["incpy#WindowFixed"] > 0 else {}
 try:
     __incpy__.cache = __incpy__.interpreter_external.new(_, opt=opt) if len(_) > 0 else __incpy__.interpreter_python_internal.new(opt=opt)
 
