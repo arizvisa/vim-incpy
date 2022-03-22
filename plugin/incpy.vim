@@ -292,7 +292,7 @@ endfunction
 function! incpy#ImportDotfile()
     " Check to see if a python site-user dotfile exists in the users home-directory.
     let source = g:incpy#PythonStartup
-    if exists(source)
+    if filereadable(source)
         let input = printf("with open(\"%s\") as infile: exec(infile.read())", escape(source, "\"\\"))
         execute printf("pythonx __incpy__.cache.communicate('%s', silent=True)", escape(input, "'\\"))
     endif
@@ -371,7 +371,7 @@ class interpreter(object):
     @__incpy__.builtin.classmethod
     def new(cls, **options):
         options.setdefault('buffer', None)
-        return cls(**options).startup()
+        return cls(**options)
 
     def __init__(self, **kwds):
         opt = {}.__class__(__incpy__.vim.gvars['incpy#CoreWindowOptions'])
@@ -401,10 +401,6 @@ class interpreter(object):
     def communicate(self, command, silent=False):
         """Sends commands to interpreter"""
         raise __incpy__.builtin.NotImplementedError
-
-    def startup(self):
-        """Initialize the recently started interpreter"""
-        return self
 
     def start(self):
         """Starts the interpreter"""
@@ -466,12 +462,6 @@ class interpreter_python_internal(__incpy__.interpreter):
     def start(self):
         __incpy__.logger.warning("internal interpreter has already been (implicitly) started")
 
-    def startup(self):
-        boolean = "'PYTHONSTARTUP' in __import__('os').environ"
-        execute = "exec(open(__import__('os').environ['PYTHONSTARTUP'], 'rt').read())"
-        self.communicate(' and '.join([boolean, execute]), silent=True)
-        return self
-
     def stop(self):
         __incpy__.logger.fatal("unable to stop internal interpreter as it is always running")
 __incpy__.interpreter_python_internal = interpreter_python_internal; del(interpreter_python_internal)
@@ -482,7 +472,7 @@ class interpreter_external(__incpy__.interpreter):
 
     @__incpy__.builtin.classmethod
     def new(cls, command, **options):
-        res = cls(**options).startup()
+        res = cls(**options)
         [ options.pop(item, None) for item in cls.view_options ]
         res.command, res.options = command, options
         return res
@@ -910,7 +900,7 @@ endfunction
     call incpy#SetupKeys()
 
     " if we're using an external program, then there's no dotfile we need to seed with.
-    if g:incpy#Program != ""
+    if g:incpy#Program == ""
         call incpy#ImportDotfile()
     endif
 
