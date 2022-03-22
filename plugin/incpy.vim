@@ -79,6 +79,7 @@
 " float  g:incpy#WindowRatio    -- the ratio of the window size when creating it
 " string g:incpy#WindowPosition -- the position at which to create the window. can be
 "                                  either "above", "below", "left", or "right".
+" string g:incpy#PythonStartup  -- the name of the dotfile to seed python's globals with.
 "
 " Todo:
 " - When the filetype of the current buffer was specified, the target output buffer
@@ -241,6 +242,13 @@ function! incpy#SetupOptions()
     let defopts["InputFormat"] = "{}\n"
     let defopts["EchoFormat"] = "# >>> {}"
 
+    " If the PYTHONSTARTUP environment-variable exists, then use it. Otherwise use the default one.
+    if exists("$PYTHONSTARTUP")
+        let defopts["PythonStartup"] = $PYTHONSTARTUP
+    else
+        let defopts["PythonStartup"] = printf("%s/.pythonrc.py", $HOME)
+    endif
+
     " Default window options that the user will override
     let defopts["CoreWindowOptions"] = {"buftype": has("terminal")? "terminal" : "nowrite", "swapfile": v:false, "updatecount":0, "buflisted": v:false}
 
@@ -279,6 +287,15 @@ function! incpy#SetupPython(currentscriptpath)
     endif
 
     throw printf("Unable to determine basepath from script %s", m)
+endfunction
+
+function! incpy#ImportDotfile()
+    " Check to see if a python site-user dotfile exists in the users home-directory.
+    let source = g:incpy#PythonStartup
+    if exists(source)
+        let input = printf("with open(\"%s\") as infile: exec(infile.read())", escape(source, "\"\\"))
+        execute printf("pythonx __incpy__.cache.communicate('%s', silent=True)", escape(input, "'\\"))
+    endif
 endfunction
 
 """ Mapping of vim commands and keys
@@ -891,6 +908,11 @@ endfunction
     call incpy#Setup()
     call incpy#SetupCommands()
     call incpy#SetupKeys()
+
+    " if we're using an external program, then there's no dotfile we need to seed with.
+    if g:incpy#Program != ""
+        call incpy#ImportDotfile()
+    endif
 
     " on entry, silently import the user module to honor any user-specific configurations
     autocmd VimEnter * pythonx hasattr(__incpy__, 'cache') and __incpy__.cache.attach()
