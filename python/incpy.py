@@ -558,7 +558,7 @@ class process(object):
         if os.name == 'nt':
             options['startupinfo'] = si = Asynchronous.spawn_options.STARTUPINFO()
             si.dwFlags = Asynchronous.spawn_options.STARTF_USESHOWWINDOW
-            si.wShowWindow = 0 if show else Asynchronous.spawn_options.SW_HIDE
+            si.wShowWindow = show if show else Asynchronous.spawn_options.SW_HIDE
             options['creationflags'] = cf = Asynchronous.spawn_options.CREATE_NEW_CONSOLE if show else 0
             options['close_fds'] = False
             options.update(dict(close_fds=False, startupinfo=si, creationflags=cf))
