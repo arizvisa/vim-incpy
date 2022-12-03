@@ -63,19 +63,22 @@
 " file. The available options are as follows.
 "
 " string g:incpy#Program      -- name of subprogram (if empty, use vim's internal python).
-" int    g:incpy#Greenlets    -- whether to use greenlets (lightweight-threads) or not.
-" int    g:incpy#OutputFollow -- flag that specifies to tail the output of the subprogram.
-" string g:incpy#InputFormat  -- the formatspec to use when executing code in the target.
-" int    g:incpy#InputStrip   -- when executing input, specify whether to strip leading indentation.
-" int    g:incpy#Echo         -- when executing input, echo it to the "Scratch" buffer.
-" string g:incpy#EchoFormat   -- the formatspec to format code to execute with.
+" bool   g:incpy#Greenlets    -- whether to use greenlets (lightweight-threads) or not.
+" bool   g:incpy#OutputFollow -- flag that specifies to tail the output of the subprogram.
+" any    g:incpy#InputStrip   -- when executing input, specify whether to strip leading indentation.
+" bool   g:incpy#Echo         -- when executing input, echo it to the "Scratch" buffer.
 " string g:incpy#HelpFormat   -- the formatspec to use when getting help on an expression.
+" string g:incpy#EchoNewline  -- the formatspec to emit when done executing input.
+" string g:incpy#EchoFormat   -- the formatspec for each line of code being emitted.
 " string g:incpy#EvalFormat   -- the formatspec to evaluate and emit an expression with.
+" any    g:incpy#EvalStrip    -- describes how to strip input before being evaluated
+" string g:incpy#ExecFormat   -- the formatspec to execute an expression with.
+" string g:incpy#ExecStrip    -- describes how to strip input before being executed
 "
 " string g:incpy#WindowName     -- the name of the output buffer. defaults to "Scratch".
-" int    g:incpy#WindowFixed    -- refuse to allow automatic resizing of the window.
+" bool   g:incpy#WindowFixed    -- refuse to allow automatic resizing of the window.
 " dict   g:incpy#WindowOptions  -- the options to use when creating the output window.
-" int    g:incpy#WindowPreview  -- whether to use preview windows for the program output.
+" bool   g:incpy#WindowPreview  -- whether to use preview windows for the program output.
 " float  g:incpy#WindowRatio    -- the ratio of the window size when creating it
 " string g:incpy#WindowPosition -- the position at which to create the window. can be
 "                                  either "above", "below", "left", or "right".
@@ -153,6 +156,61 @@ function! s:strip_common_indent(lines, size)
     return results
 endfunction
 
+function! s:python_strip_indent(lines)
+    let indentsize = s:find_common_indent(a:lines)
+    return s:strip_common_indent(a:lines, indentsize)
+endfunction
+
+function! s:striplist_by_option(option, lines)
+    let items = a:lines
+
+    " Strip the fetched lines if the user configured us to
+    if type(a:option) == v:t_bool
+        let result = a:option == v:true? map(items, "trim(v:val)") : items
+
+    " If the type is a string, then use it as a regex that
+    elseif type(a:option) == v:t_string
+        let result = map(items, a:option)
+
+    "  Otherwise it's a function to use as a transformation
+    elseif type(a:option) == v:t_func
+        let F = a:option
+        let result = F(items)
+
+    else
+        throw printf("Unknown filtering option (%s): %s", typename(a:option), a:option)
+    endif
+
+    return result
+endfunction
+
+function! s:stripstring_by_option(option, string)
+    if type(a:option) == v:t_bool
+        let result = a:option == v:true? trim(a:string) : a:string
+    elseif type(a:option) == v:t_string
+        let expression = a:option
+        let results = map([a:string], expression)
+        let result = results[0]
+    elseif type(a:option) == v:t_func
+        let F = a:option
+        let result = F(string)
+    else
+        throw printf("Unknown filtering option (%s): %s", typename(a:option), a:option)
+    endif
+    return result
+endfunction
+
+function! s:strip_by_option(option, input)
+    if type(a:input) == v:t_list
+        let result = s:striplist_by_option(a:option, a:input)
+    elseif type(a:input) == v:t_string
+        let result = s:stripstring_by_option(a:option, a:input)
+    else
+        throw printf("Unknown parameter type: %s", type(a:input))
+    endif
+    return result
+endfunction
+
 """ Window management
 function! s:windowselect(id)
 
@@ -222,15 +280,14 @@ function! incpy#SetupOptions()
     " Set any default options for the plugin that the user missed
     let defopts = {}
     let defopts["Program"] = ""
-    let defopts["Greenlets"] = 0
-    let defopts["Echo"] = 1
-    let defopts["OutputFollow"] = 1
-    let defopts["InputStrip"] = 1
+    let defopts["Greenlets"] = v:false
+    let defopts["Echo"] = v:true
+    let defopts["OutputFollow"] = v:true
     let defopts["WindowName"] = "Scratch"
     let defopts["WindowRatio"] = 1.0/3
     let defopts["WindowPosition"] = "below"
     let defopts["WindowOptions"] = {}
-    let defopts["WindowPreview"] = 0
+    let defopts["WindowPreview"] = v:false
     let defopts["WindowFixed"] = 0
     let python_builtins = "__import__(\"builtins\")"
     let defopts["HelpFormat"] = printf("try:exec(\"%s.help({0})\")\nexcept SyntaxError:%s.help(\"{0}\")\n", escape(python_builtins, "\"\\"), python_builtins)
@@ -238,9 +295,14 @@ function! incpy#SetupOptions()
     " let defopts["EvalFormat"] = printf("__incpy__.sys.displayhook({})')")
     " let defopts["EvalFormat"] = printf("__incpy__.builtin._={};print __incpy__.__builtin__._")
     let python_sys = "__import__(\"sys\")"
-    let defopts["EvalFormat"] = printf("%s.displayhook({})", python_sys)
-    let defopts["InputFormat"] = "{}\n"
+
+    let defopts["InputStrip"] = function("s:python_strip_indent")
     let defopts["EchoFormat"] = "# >>> {}"
+    let defopts["EchoNewline"] = "{}\n"
+    let defopts["EvalFormat"] = printf("%s.displayhook({})", python_sys)
+    let defopts["EvalStrip"] = v:false
+    let defopts["ExecFormat"] = "{}\n"
+    let defopts["ExecStrip"] = v:false
 
     " If the PYTHONSTARTUP environment-variable exists, then use it. Otherwise use the default one.
     if exists("$PYTHONSTARTUP")
@@ -343,7 +405,7 @@ endfunction
 function! incpy#Setup()
 
     " Set any the options for the python module part.
-    if g:incpy#Greenlets > 0
+    if g:incpy#Greenlets
         " If greenlets were specified, then enable it by importing 'gevent' into the current python environment
         pythonx __import__('gevent')
     elseif g:incpy#Program != ""
@@ -451,12 +513,11 @@ class interpreter_python_internal(__incpy__.interpreter):
         (sys.stdin, sys.stdout, sys.stderr, _), self.state = self.state, None
 
     def communicate(self, data, silent=False):
-        inputformat = __incpy__.vim.gvars['incpy#InputFormat']
+        echonewline = __incpy__.vim.gvars['incpy#EchoNewline']
         if __incpy__.vim.gvars['incpy#Echo'] and not silent:
             echoformat = __incpy__.vim.gvars['incpy#EchoFormat']
             echo = '\n'.join(map(echoformat.format, data.split('\n')))
-            echo = inputformat.format(echo)
-            self.write(echo)
+            self.write(echonewline.format(echo))
         __incpy__.six.exec_(data, __incpy__.builtin.globals())
 
     def start(self):
@@ -502,14 +563,12 @@ class interpreter_external(__incpy__.interpreter):
         self.instance = None
 
     def communicate(self, data, silent=False):
-        inputformat = __incpy__.vim.gvars['incpy#InputFormat']
+        echonewline = __incpy__.vim.gvars['incpy#EchoNewline']
         if __incpy__.vim.gvars['incpy#Echo'] and not silent:
             echoformat = __incpy__.vim.gvars['incpy#EchoFormat']
             echo = echoformat.format(data)
-            echo = inputformat.format(data)
-            self.write(echo)
-        input = inputformat.format(data)
-        self.instance.write(input)
+            self.write(echonewline.format(echo))
+        self.instance.write(data)
 
     def __repr__(self):
         res = __incpy__.builtin.super(__incpy__.interpreter_external, self).__repr__()
@@ -857,16 +916,12 @@ endfunction
 function! incpy#Range(begin, end)
     " Execute the specified lines in the target
     let lines = getline(a:begin, a:end)
-
-    " Strip the fetched lines if the user configured us to
-    if g:incpy#InputStrip
-        let indentsize = s:find_common_indent(lines)
-        let lines = s:strip_common_indent(lines, indentsize)
-    endif
+    let stripped = s:strip_by_option(g:incpy#InputStrip, lines)
 
     " Execute the lines in our target
-    let code_s = join(map(lines, 'escape(v:val, "''\\")'), "\\n")
-    execute printf("pythonx __incpy__.cache.communicate('%s')", code_s)
+    let code = join(map(stripped, 'escape(v:val, "''\\")'), "\\n")
+    let code_stripped = s:strip_by_option(g:incpy#ExecStrip, code)
+    execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#ExecFormat, "\"\\"), escape(code_stripped, "\""))
 
     " If the user configured us to follow the output, then do as we were told.
     if g:incpy#OutputFollow
@@ -875,8 +930,10 @@ function! incpy#Range(begin, end)
 endfunction
 
 function! incpy#Evaluate(expr)
+    let stripped = s:strip_by_option(g:incpy#EvalStrip, a:expr)
+
     " Evaluate and emit an expression in the target using the plugin
-    execute printf("pythonx __incpy__.cache.communicate(\"%s\".format(\"%s\"))", s:singleline(g:incpy#EvalFormat, "\"\\"), escape(a:expr, "\"\\"))
+    execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#EvalFormat, "\"\\"), escape(stripped, "\""))
 
     if g:incpy#OutputFollow
         try | call s:windowtail(g:incpy#BufferId) | catch /^Invalid/ | endtry
@@ -888,7 +945,7 @@ function! incpy#Halp(expr)
     let LetMeSeeYouStripped = substitute(a:expr, '^[ \t\n]\+\|[ \t\n]\+$', '', 'g')
 
     " Execute g:incpy#HelpFormat in the target using the plugin's cached communicator
-    execute printf("pythonx __incpy__.cache.communicate(\"%s\".format(\"%s\"))", s:singleline(g:incpy#HelpFormat, "\"\\"), escape(LetMeSeeYouStripped, "\"\\"))
+    execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#HelpFormat, "\"\\"), escape(LetMeSeeYouStripped, "\"\\"))
 endfunction
 
 """ Actual execution and setup of the plugin
@@ -909,7 +966,7 @@ endfunction
     autocmd VimLeavePre * pythonx hasattr(__incpy__, 'cache') and __incpy__.cache.detach()
 
     " if greenlets were specifed then make sure to update them during cursor movement
-    if g:incpy#Greenlets > 0
+    if g:incpy#Greenlets
         autocmd CursorHold * pythonx __import__('gevent').idle(0.0)
         autocmd CursorHoldI * pythonx __import__('gevent').idle(0.0)
         autocmd CursorMoved * pythonx __import__('gevent').idle(0.0)
