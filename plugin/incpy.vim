@@ -516,7 +516,9 @@ class interpreter_python_internal(__incpy__.interpreter):
         echonewline = __incpy__.vim.gvars['incpy#EchoNewline']
         if __incpy__.vim.gvars['incpy#Echo'] and not silent:
             echoformat = __incpy__.vim.gvars['incpy#EchoFormat']
-            echo = '\n'.join(map(echoformat.format, data.split('\n')))
+            lines = data.split('\n')
+            trimmed = sum(1 for item in reversed(lines) if not item.strip())
+            echo = '\n'.join(map(echoformat.format, lines[:-trimmed] if trimmed > 0 else lines))
             self.write(echonewline.format(echo))
         __incpy__.six.exec_(data, __incpy__.builtin.globals())
 
@@ -566,7 +568,9 @@ class interpreter_external(__incpy__.interpreter):
         echonewline = __incpy__.vim.gvars['incpy#EchoNewline']
         if __incpy__.vim.gvars['incpy#Echo'] and not silent:
             echoformat = __incpy__.vim.gvars['incpy#EchoFormat']
-            echo = echoformat.format(data)
+            lines = data.split('\n')
+            trimmed = sum(1 for item in reversed(lines) if not item.strip())
+            echo = '\n'.join(map(echoformat.format, lines[:-trimmed] if trimmed > 0 else lines))
             self.write(echonewline.format(echo))
         self.instance.write(data)
 
