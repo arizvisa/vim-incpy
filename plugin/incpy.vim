@@ -156,9 +156,33 @@ function! s:strip_common_indent(lines, size)
     return results
 endfunction
 
-function! s:python_strip_indent(lines)
+function! s:python_strip_and_fix_indent(lines)
     let indentsize = s:find_common_indent(a:lines)
-    return s:strip_common_indent(a:lines, indentsize)
+    let stripped = s:strip_common_indent(a:lines, indentsize)
+
+    " trim any beginning lines that are meaningless
+    let l:start = 0
+    for l:index in range(len(stripped))
+        let l:item = stripped[l:index]
+        if strlen(l:item) > 0 && l:item !~ '^\s\+$'
+            break
+        endif
+        let l:start += 1
+    endfor
+
+    " trim any ending lines that are meaningless
+    let l:tail = 0
+    for l:index in range(len(stripped))
+        let l:tail += 1
+        let l:item = stripped[-(1 + l:index)]
+        if strlen(l:item) > 0 && l:item !~ '^\s\+$'
+            break
+        endif
+    endfor
+
+    " if the last line is indented, then we append another newline (python)
+    let result = stripped[l:start : -l:tail]
+    return result[-1] =~ '^\s\+'? result + [''] : result
 endfunction
 
 function! s:striplist_by_option(option, lines)
@@ -193,7 +217,7 @@ function! s:stripstring_by_option(option, string)
         let result = results[0]
     elseif type(a:option) == v:t_func
         let F = a:option
-        let result = F(string)
+        let result = F(a:string)
     else
         throw printf("Unknown filtering option (%s): %s", typename(a:option), a:option)
     endif
@@ -291,15 +315,15 @@ function! incpy#SetupOptions()
     let defopts["WindowFixed"] = 0
     let python_builtins = "__import__(\"builtins\")"
     let defopts["HelpFormat"] = printf("try:exec(\"%s.help({0})\")\nexcept SyntaxError:%s.help(\"{0}\")\n", escape(python_builtins, "\"\\"), python_builtins)
+    let python_sys = "__import__(\"sys\")"
+
+    let defopts["InputStrip"] = function("s:python_strip_and_fix_indent")
+    let defopts["EchoFormat"] = "# >>> {}"
+    let defopts["EchoNewline"] = "{}\n"
     " let defopts["EvalFormat"] = printf("_={};print _')", python_builtins, python_builtins, python_builtins)
     " let defopts["EvalFormat"] = printf("__incpy__.sys.displayhook({})')")
     " let defopts["EvalFormat"] = printf("__incpy__.builtin._={};print __incpy__.__builtin__._")
-    let python_sys = "__import__(\"sys\")"
-
-    let defopts["InputStrip"] = function("s:python_strip_indent")
-    let defopts["EchoFormat"] = "# >>> {}"
-    let defopts["EchoNewline"] = "{}\n"
-    let defopts["EvalFormat"] = printf("%s.displayhook({})", python_sys)
+    let defopts["EvalFormat"] = printf("%s.displayhook({})\n", python_sys)
     let defopts["EvalStrip"] = v:false
     let defopts["ExecFormat"] = "{}\n"
     let defopts["ExecStrip"] = v:false
@@ -408,7 +432,7 @@ function! incpy#Setup()
     if g:incpy#Greenlets
         " If greenlets were specified, then enable it by importing 'gevent' into the current python environment
         pythonx __import__('gevent')
-    elseif g:incpy#Program != ""
+    elseif g:incpy#Program != "" && !has("terminal")
         " Otherwise we only need to warn the user that they should use it if they're trying to run an external program
         echohl WarningMsg | echomsg "WARNING:incpy.vim:Using vim-incpy to run an external program without support for greenlets will be unstable" | echohl None
     endif
@@ -589,6 +613,102 @@ class interpreter_external(__incpy__.interpreter):
         self.instance.stop()
 __incpy__.interpreter_external = interpreter_external; del(interpreter_external)
 
+# terminal interpreter
+class interpreter_terminal(__incpy__.interpreter):
+    instance = None
+
+    @__incpy__.builtin.classmethod
+    def new(cls, command, **options):
+        res = cls(**options)
+        [ options.pop(item, None) for item in cls.view_options ]
+        res.command, res.options = command, options
+        return res
+
+    def __init__(self, **kwds):
+        opt = {}.__class__(__incpy__.vim.gvars['incpy#CoreWindowOptions'])
+        opt.update(__incpy__.vim.gvars['incpy#WindowOptions'])
+        opt.update(kwds.pop('opt', {}))
+        self.__options = opt
+
+        kwds.setdefault('preview', __incpy__.vim.gvars['incpy#WindowPreview'])
+        kwds.setdefault('tab', __incpy__.internal.tab.getCurrent())
+        self.__keywords = kwds
+        #self.__view = None
+        self.buffer = None
+
+    @property
+    def view(self):
+        #if self.__view:
+        #    return self.__view
+        current = __incpy__.internal.window.current()
+        #__incpy__.internal.window.select(__incpy__.vim.gvars['incpy#WindowName'])
+        #__incpy__.vim.command('terminal ++open ++noclose ++curwin')
+        buffer = self.start() if self.buffer is None else self.buffer
+        self.__view = res = __incpy__.view(buffer, self.__options, **self.__keywords)
+        __incpy__.internal.window.select(current)
+        return res
+
+    def attach(self):
+        """Attaches interpreter to view"""
+        view = self.view
+        window = view.window
+        current = __incpy__.internal.window.current()
+
+        # search to see if window exists, if it doesn't..then show it.
+        searched = __incpy__.internal.window.buffer(self.buffer)
+        if searched < 0:
+            self.view.buffer = self.buffer
+
+        __incpy__.internal.window.select(current)
+        # do nothing, always attached
+
+    def detach(self):
+        """Detaches interpreter from view"""
+        # do nothing, always attached
+
+    def communicate(self, data, silent=False):
+        """Sends commands to interpreter"""
+        echonewline = __incpy__.vim.gvars['incpy#EchoNewline']
+        if __incpy__.vim.gvars['incpy#Echo'] and not silent:
+            echoformat = __incpy__.vim.gvars['incpy#EchoFormat']
+            lines = data.split('\n')
+            trimmed = sum(1 for item in reversed(lines) if not item.strip())
+
+            # Terminals don't let you modify or edit the buffer in any way
+            #echo = '\n'.join(map(echoformat.format, lines[:-trimmed] if trimmed > 0 else lines))
+            #self.write(echonewline.format(echo))
+
+        term_sendkeys = __incpy__.vim.Function('term_sendkeys')
+        buffer = self.view.buffer
+        term_sendkeys(buffer.number, data)
+
+    def start(self):
+        """Starts the interpreter"""
+        term_start = __incpy__.vim.Function('term_start')
+        options = vim.Dictionary({
+            "hidden": 1,
+            "stoponexit": 'term',
+            "term_name": __incpy__.vim.gvars['incpy#WindowName'],
+            "term_kill": 'hup',
+            "term_finish": "open",
+        })
+        self.buffer = res = term_start(self.command, options)
+        return res
+
+    def stop(self):
+        """Stops the interpreter"""
+        term_getjob = __incpy__.vim.Function('term_getjob')
+        job = term_getjob(self.buffer)
+
+        job_stop = __incpy__.vim.Function('job_stop')
+        job_stop(job)
+
+        job_status = __incpy__.vim.Function('job_status')
+        if job_status(job) != 'dead':
+            raise builtin.Exception("Unable to terminate job {:d}".format(job))
+        return
+__incpy__.interpreter_terminal = interpreter_terminal; del(interpreter_terminal)
+
 # vim internal
 class internal(object):
     """Commands that interface with vim directly"""
@@ -668,9 +788,9 @@ class internal(object):
         def currentsize(position):
             builtin = __incpy__.builtin
             if position in ('left', 'right'):
-                return builtin.int(__incpy__.vim.eval('winwidth(0)'))
+                return builtin.int(__incpy__.vim.eval('&columns'))
             if position in ('above', 'below'):
-                return builtin.int(__incpy__.vim.eval('winheight(0)'))
+                return builtin.int(__incpy__.vim.eval('&lines'))
             raise builtin.ValueError(position)
 
         # properties
@@ -681,9 +801,11 @@ class internal(object):
 
         # window actions
         @__incpy__.builtin.classmethod
-        def create(cls, bufferid, position, size, options, preview=False):
+        def create(cls, bufferid, position, ratio, options, preview=False):
             builtin = __incpy__.builtin
             last = cls.current()
+
+            size = cls.currentsize(position) * ratio
             if preview:
                 if builtin.len(options) > 0:
                     __incpy__.vim.command("noautocmd silent {:s} pedit! +setlocal\\ {:s} {:s}".format(cls.positionToLocation(position), cls.optionsToCommandLine(options), __incpy__.internal.buffer.name(bufferid)))
@@ -691,16 +813,17 @@ class internal(object):
                     __incpy__.vim.command("noautocmd silent {:s} pedit! {:s}".format(cls.positionToLocation(position), __incpy__.internal.buffer.name(bufferid)))
             else:
                 if builtin.len(options) > 0:
-                    __incpy__.vim.command("noautocmd silent {:s} {:d}{:s}! +setlocal\\ {:s} {:s}".format(cls.positionToLocation(position), size, cls.positionToSplit(position), cls.optionsToCommandLine(options), __incpy__.internal.buffer.name(bufferid)))
+                    __incpy__.vim.command("noautocmd silent {:s} {:d}{:s}! +setlocal\\ {:s} {:s}".format(cls.positionToLocation(position), builtin.int(size), cls.positionToSplit(position), cls.optionsToCommandLine(options), __incpy__.internal.buffer.name(bufferid)))
                 else:
-                    __incpy__.vim.command("noautocmd silent {:s} {:d}{:s}! {:s}".format(cls.positionToLocation(position), size, cls.positionToSplit(position), __incpy__.internal.buffer.name(bufferid)))
+                    __incpy__.vim.command("noautocmd silent {:s} {:d}{:s}! {:s}".format(cls.positionToLocation(position), builtin.int(size), cls.positionToSplit(position), __incpy__.internal.buffer.name(bufferid)))
 
             res = cls.current()
-            cls.select(last)
             if not builtin.bool(__incpy__.vim.gvars['incpy#WindowPreview']):
                 wid = cls.buffer(bufferid)
                 if res != wid:
-                    raise AssertionError("Newly created window is not pointing to the correct buffer id : {!r} != {!r}".format(wid, res))
+                    __incpy__.vim.command("buffer {:d}".format(res))
+                    __incpy__.logger.debug("Adjusted buffer ({:d}) for window {:d} to point to the correct buffer id ({:d})".format(wid, __incpy__.vim.eval("winnr()"), res))
+            cls.select(last)
             return res
 
         @__incpy__.builtin.classmethod
@@ -785,8 +908,9 @@ class view(object):
 
         # Now we can grab the buffer's name so that we can use it to re-create
         # the buffer if it was deleted by the user.
-        res = "'{!s}'".format(buf.name.replace("'", "''"))
-        self.__buffer_name = __incpy__.vim.eval("fnamemodify({:s}, \":.\")".format(res))
+        self.__buffer_name = buf.number
+        #res = "'{!s}'".format(buf.name.replace("'", "''"))
+        #self.__buffer_name = __incpy__.vim.eval("fnamemodify({:s}, \":.\")".format(res))
 
     @property
     def buffer(self):
@@ -806,6 +930,15 @@ class view(object):
 
         # Return the buffer we found back to the caller.
         return result
+    @buffer.setter
+    def buffer(self, number):
+        id = __incpy__.vim.eval("bufnr({:d})".format(number))
+        name = __incpy__.vim.eval("bufname({:d})".format(id))
+        if id < 0:
+            raise __incpy__.incpy.vim.error("Unable to locate buffer id from parameter : {!r}".format(number))
+        elif not name:
+            raise __incpy__.incpy.vim.error("Unable to determine output buffer name from parameter : {!r}".format(number))
+        self.__buffer_name = id
 
     @property
     def window(self):
@@ -831,8 +964,7 @@ class view(object):
             raise builtin.Exception("Specified ratio is out of bounds {!r}".format(ratio))
 
         current = __incpy__.internal.window.current()
-        sz = __incpy__.internal.window.currentsize(position) * ratio
-        return __incpy__.internal.window.create(result.number, position, builtin.int(sz), self.options, preview=self.preview)
+        return __incpy__.internal.window.create(result.number, position, ratio, self.options, preview=self.preview)
 
     def show(self, position):
         """Show window at the specified position"""
@@ -873,7 +1005,12 @@ __incpy__.view = view; del(view)
 _ = __incpy__.vim.gvars["incpy#Program"]
 opt = {'winfixwidth':True, 'winfixheight':True} if __incpy__.vim.gvars["incpy#WindowFixed"] > 0 else {}
 try:
-    __incpy__.cache = __incpy__.interpreter_external.new(_, opt=opt) if len(_) > 0 else __incpy__.interpreter_python_internal.new(opt=opt)
+    if __incpy__.vim.eval('has("terminal")') and len(_) > 0:
+        __incpy__.cache = __incpy__.interpreter_terminal.new(_, opt=opt)
+    elif len(_) > 0:
+        __incpy__.cache = __incpy__.interpreter_external.new(_, opt=opt)
+    else:
+        __incpy__.cache = __incpy__.interpreter_python_internal.new(opt=opt)
 
 except Exception:
     __incpy__.logger.fatal("error starting external interpreter: {:s}".format(_), exc_info=True)
