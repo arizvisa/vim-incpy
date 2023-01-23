@@ -181,8 +181,13 @@ function! s:python_strip_and_fix_indent(lines)
     endfor
 
     " if the last line is indented, then we append another newline (python)
-    let result = stripped[l:start : -l:tail]
-    return result[-1] =~ '^\s\+'? result + [''] : result
+    let trimmed = stripped[l:start : -l:tail]
+    if len(trimmed) > 0
+        let result = trimmed[-1] =~ '^\s\+'? trimmed + [''] : trimmed
+    else
+        let result = trimmed
+    endif
+    return result
 endfunction
 
 function! s:striplist_by_option(option, lines)
@@ -314,7 +319,7 @@ function! incpy#SetupOptions()
     let defopts["WindowPreview"] = v:false
     let defopts["WindowFixed"] = 0
     let python_builtins = "__import__(\"builtins\")"
-    let defopts["HelpFormat"] = printf("try:exec(\"%s.help({0})\")\nexcept SyntaxError:%s.help(\"{0}\")\n", escape(python_builtins, "\"\\"), python_builtins)
+    let defopts["HelpFormat"] = printf("try:exec(\"%s.help({0})\")\nexcept SyntaxError:%s.help(\"{0}\")\n\n", escape(python_builtins, "\"\\"), python_builtins)
     let python_sys = "__import__(\"sys\")"
 
     let defopts["InputStrip"] = function("s:python_strip_and_fix_indent")
@@ -614,21 +619,23 @@ class interpreter_external(__incpy__.interpreter):
 __incpy__.interpreter_external = interpreter_external; del(interpreter_external)
 
 # terminal interpreter
-class interpreter_terminal(__incpy__.interpreter):
+class interpreter_terminal(__incpy__.interpreter_external):
     instance = None
 
-    @__incpy__.builtin.classmethod
-    def new(cls, command, **options):
-        res = cls(**options)
-        [ options.pop(item, None) for item in cls.view_options ]
-        res.command, res.options = command, options
-        return res
+    # hacked this in because i'm not sure what interpreter_external is supposed to be doing
+    @property
+    def options(self):
+        return self.__options
+    @options.setter
+    def options(self, dict):
+        self.__options.update(dict)
 
     def __init__(self, **kwds):
+        self.__options = {'hidden': True}
         opt = {}.__class__(__incpy__.vim.gvars['incpy#CoreWindowOptions'])
         opt.update(__incpy__.vim.gvars['incpy#WindowOptions'])
         opt.update(kwds.pop('opt', {}))
-        self.__options = opt
+        self.__options.update(opt)
 
         kwds.setdefault('preview', __incpy__.vim.gvars['incpy#WindowPreview'])
         kwds.setdefault('tab', __incpy__.internal.tab.getCurrent())
@@ -644,7 +651,7 @@ class interpreter_terminal(__incpy__.interpreter):
         #__incpy__.internal.window.select(__incpy__.vim.gvars['incpy#WindowName'])
         #__incpy__.vim.command('terminal ++open ++noclose ++curwin')
         buffer = self.start() if self.buffer is None else self.buffer
-        self.__view = res = __incpy__.view(buffer, self.__options, **self.__keywords)
+        self.__view = res = __incpy__.view(buffer, self.options, **self.__keywords)
         __incpy__.internal.window.select(current)
         return res
 
@@ -685,12 +692,19 @@ class interpreter_terminal(__incpy__.interpreter):
     def start(self):
         """Starts the interpreter"""
         term_start = __incpy__.vim.Function('term_start')
+
+        # because python is maintained by fucking idiots
+        ignored_env = {'PAGER', 'MANPAGER'}
+        filtered_env = {name : '' if name in ignored_env else value for name, value in __import__('os').environ.items() if name not in ignored_env}
+        filtered_env['TERM'] = 'emacs'
+
         options = vim.Dictionary({
             "hidden": 1,
             "stoponexit": 'term',
             "term_name": __incpy__.vim.gvars['incpy#WindowName'],
             "term_kill": 'hup',
             "term_finish": "open",
+            # "env": vim.Dictionary(filtered_env),  # because VIM doesn't do as it's told
         })
         self.buffer = res = term_start(self.command, options)
         return res
@@ -827,20 +841,11 @@ class internal(object):
             return res
 
         @__incpy__.builtin.classmethod
-        def show(cls, bufferid, position, preview=False):
+        def show(cls, bufferid, position, ratio, options, preview=False):
             buf = cls.buffer(bufferid)
 
-            last = cls.select(buf)
-            if preview:
-                __incpy__.vim.command("noautocmd silent {:s} pedit! {:s}".format(cls.positionToLocation(position), __incpy__.internal.buffer.name(bufferid)))
-            else:
-                __incpy__.vim.command("noautocmd silent {:s} {:s}! {:s}".format(cls.positionToLocation(position), cls.positionToSplit(position), __incpy__.internal.buffer.name(bufferid)))
-
-            res = cls.current()
-            cls.select(last)
-            if res != cls.buffer(bufferid):
-                raise AssertionError
-            return res
+            # if we already have a windowid for the buffer, then we leave 'cause it's already showing.
+            return cls.create(bufferid, position, ratio, options, preview=preview) if buf < 0 else buf
 
         @__incpy__.builtin.classmethod
         def hide(cls, bufferid, preview=False):
@@ -966,8 +971,8 @@ class view(object):
         current = __incpy__.internal.window.current()
         return __incpy__.internal.window.create(result.number, position, ratio, self.options, preview=self.preview)
 
-    def show(self, position):
-        """Show window at the specified position"""
+    def show(self, position, ratio):
+        """Show window at the specified position if it is not already showing."""
         builtin = __incpy__.builtin
 
         # FIXME: showing a view in another tab is not supported yet
@@ -975,10 +980,10 @@ class view(object):
 
         if __incpy__.internal.buffer.number(result.number) == -1:
             raise builtin.Exception("Buffer {:d} does not exist".format(result.number))
-        if __incpy__.internal.buffer.window(result.number) != -1:
-            raise builtin.Exception("Window for {:d} is already showing".format(result.number))
+        # if __incpy__.internal.buffer.window(result.number) != -1:
+        #    raise builtin.Exception("Window for {:d} is already showing".format(result.number))
 
-        return __incpy__.internal.window.show(result.number, position, preview=self.preview)
+        return __incpy__.internal.window.show(result.number, position, ratio, self.options, preview=self.preview)
 
     def hide(self):
         """Hide the window"""
@@ -1047,7 +1052,16 @@ function! incpy#Restart()
 endfunction
 
 """ Plugin interaction interface
+function! incpy#Show()
+    execute "pythonx __incpy__.cache.view.show(__incpy__.vim.gvars['incpy#WindowPosition'], __incpy__.vim.gvars['incpy#WindowRatio'])"
+endfunction
+
+function! incpy#Hide()
+    execute "pythonx __incpy__.cache.view.hide()"
+endfunction
+
 function! incpy#Execute(line)
+    call incpy#Show()
     execute printf("pythonx __incpy__.cache.communicate('%s')", escape(a:line, "'\\"))
     if g:incpy#OutputFollow
         try | call s:windowtail(g:incpy#BufferId) | catch /^Invalid/ | endtry
@@ -1062,6 +1076,7 @@ function! incpy#Range(begin, end)
     " Execute the lines in our target
     let code = join(map(stripped, 'escape(v:val, "''\\")'), "\\n")
     let code_stripped = s:strip_by_option(g:incpy#ExecStrip, code)
+    call incpy#Show()
     execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#ExecFormat, "\"\\"), escape(code_stripped, "\""))
 
     " If the user configured us to follow the output, then do as we were told.
@@ -1074,6 +1089,7 @@ function! incpy#Evaluate(expr)
     let stripped = s:strip_by_option(g:incpy#EvalStrip, a:expr)
 
     " Evaluate and emit an expression in the target using the plugin
+    call incpy#Show()
     execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#EvalFormat, "\"\\"), escape(stripped, "\""))
 
     if g:incpy#OutputFollow
@@ -1086,6 +1102,7 @@ function! incpy#Halp(expr)
     let LetMeSeeYouStripped = substitute(a:expr, '^[ \t\n]\+\|[ \t\n]\+$', '', 'g')
 
     " Execute g:incpy#HelpFormat in the target using the plugin's cached communicator
+    call incpy#Show()
     execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#HelpFormat, "\"\\"), escape(LetMeSeeYouStripped, "\"\\"))
 endfunction
 
