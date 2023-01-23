@@ -319,7 +319,8 @@ function! incpy#SetupOptions()
     let defopts["WindowPreview"] = v:false
     let defopts["WindowFixed"] = 0
     let python_builtins = "__import__(\"builtins\")"
-    let defopts["HelpFormat"] = printf("try:exec(\"%s.help({0})\")\nexcept SyntaxError:%s.help(\"{0}\")\n\n", escape(python_builtins, "\"\\"), python_builtins)
+    let python_pydoc = "__import__(\"pydoc\")"
+    let defopts["HelpFormat"] = printf("%s.getpager = lambda: %s.plainpager\ntry:exec(\"%s.help({0})\")\nexcept SyntaxError:%s.help(\"{0}\")\n\n", python_pydoc, python_pydoc, escape(python_builtins, "\"\\"), python_builtins)
     let python_sys = "__import__(\"sys\")"
 
     let defopts["InputStrip"] = function("s:python_strip_and_fix_indent")
