@@ -791,12 +791,12 @@ class internal(object):
         # window selection
         @__incpy__.builtins.staticmethod
         def current():
-            '''return the current window'''
+            '''return the current window number'''
             return __incpy__.builtins.int(__incpy__.vim.eval('winnr()'))
 
         @__incpy__.builtins.staticmethod
         def select(window):
-            '''Select the window with the specified id'''
+            '''Select the window with the specified window number'''
             return (__incpy__.builtins.int(__incpy__.vim.eval('winnr()')), __incpy__.vim.command("{:d} wincmd w".format(window)))[0]
 
         @__incpy__.builtins.staticmethod
@@ -810,13 +810,19 @@ class internal(object):
 
         # properties
         @__incpy__.builtins.staticmethod
-        def buffer(bufferid):
-            '''Return the window according to the bufferid'''
-            return __incpy__.builtins.int(__incpy__.vim.eval("winbufnr({:d})".format(bufferid)))
+        def buffer(window):
+            '''Return the bufferid for the specified window'''
+            return __incpy__.builtins.int(__incpy__.vim.eval("winbufnr({:d})".format(window)))
+
+        @__incpy__.builtins.staticmethod
+        def available(bufferid):
+            '''Return the first window number for a buffer id'''
+            return __incpy__.builtins.int(__incpy__.vim.eval("bufwinnr({:d})".format(bufferid)))
 
         # window actions
         @__incpy__.builtins.classmethod
         def create(cls, bufferid, position, ratio, options, preview=False):
+            '''create a window for the bufferid and return its number'''
             builtins = __incpy__.builtins
             last = cls.current()
 
@@ -832,21 +838,37 @@ class internal(object):
                 else:
                     __incpy__.vim.command("noautocmd silent {:s} {:d}{:s}! {:s}".format(cls.positionToLocation(position), builtins.int(size), cls.positionToSplit(position), __incpy__.internal.buffer.name(bufferid)))
 
-            res = cls.current()
-            if not builtins.bool(__incpy__.vim.gvars['incpy#WindowPreview']):
-                wid = cls.buffer(bufferid)
-                if res != wid:
-                    __incpy__.vim.command("buffer {:d}".format(res))
-                    __incpy__.logger.debug("Adjusted buffer ({:d}) for window {:d} to point to the correct buffer id ({:d})".format(wid, __incpy__.vim.eval("winnr()"), res))
-            cls.select(last)
-            return res
+            # grab the newly created window
+            new = cls.current()
+            try:
+                if builtins.bool(__incpy__.vim.gvars['incpy#WindowPreview']):
+                    return new
+
+                newbufferid = cls.buffer(new)
+                if bufferid > 0 and newbufferid == bufferid:
+                    return new
+
+                # if the bufferid doesn't exist, then we have to recreate one.
+                if __incpy__.vim.eval("bufnr({:d})".format(bufferid)) < 0:
+                    raise Exception("The requested buffer ({:d}) does not exist and will need to be created.".format(bufferid))
+
+                # if our new bufferid doesn't match the requested one, then we switch to it.
+                elif newbufferid != bufferid:
+                    __incpy__.vim.command("buffer {:d}".format(bufferid))
+                    __incpy__.logger.debug("Adjusted buffer ({:d}) for window {:d} to point to the correct buffer id ({:d})".format(newbufferid, new, bufferid))
+
+            finally:
+                cls.select(last)
+            return new
 
         @__incpy__.builtins.classmethod
         def show(cls, bufferid, position, ratio, options, preview=False):
-            buf = cls.buffer(bufferid)
+            '''return the window for the bufferid, recreating it if its now showing'''
+            window = cls.available(bufferid)
 
-            # if we already have a windowid for the buffer, then we leave 'cause it's already showing.
-            return cls.create(bufferid, position, ratio, options, preview=preview) if buf < 0 else buf
+            # if we already have a windowid for the buffer, then we can return it. otherwise
+            # we rec-reate the window which should get the buffer to work.
+            return window if window > 0 else cls.create(bufferid, position, ratio, options, preview=preview)
 
         @__incpy__.builtins.classmethod
         def hide(cls, bufferid, preview=False):
@@ -855,7 +877,7 @@ class internal(object):
                 __incpy__.vim.command("noautocmd silent pclose!")
             else:
                 __incpy__.vim.command("noautocmd silent close!")
-            cls.select(last)
+            return cls.select(last)
 
         # window state
         @__incpy__.builtins.classmethod
@@ -905,12 +927,15 @@ class view(object):
         # If we couldn't find the desired buffer, then we'll just create one
         # with the name that we were given.
         except Exception as E:
-            if not isinstance(buffer, __incpy__.six.string_types):
-                raise __incpy__.incpy.vim.error("Unable to determine output buffer name from parameter : {!r}".format(buffer))
 
             # Create a buffer with the specified name. This is not really needed
             # as we're only creating it to sneak off with the buffer's name.
-            buf = __incpy__.buffer.new(buffer)
+            if isinstance(buffer, __incpy__.six.string_types):
+                buf = __incpy__.buffer.new(buffer)
+            elif isinstance(buffer, __incpy__.six.integer_types):
+                buf = __incpy__.buffer.new(__incpy__.vim.gvars['incpy#WindowName'])
+            else:
+                raise __incpy__.incpy.vim.error("Unable to determine output buffer name from parameter : {!r}".format(buffer))
 
         # Now we can grab the buffer's name so that we can use it to re-create
         # the buffer if it was deleted by the user.
@@ -932,7 +957,12 @@ class view(object):
             __incpy__.logger.info("recreating output buffer due to exception : {!s}".format(E), exc_info=True)
 
             # Create a new buffer using the name that we expect it to have.
-            result = __incpy__.buffer.new(name)
+            if isinstance(name, __incpy__.six.string_types):
+                result = __incpy__.buffer.new(name)
+            elif isinstance(name, __incpy__.six.integer_types):
+                result = __incpy__.buffer.new(__incpy__.vim.gvars['incpy#WindowName'])
+            else:
+                raise __incpy__.incpy.vim.error("Unable to determine output buffer name from parameter : {!r}".format(name))
 
         # Return the buffer we found back to the caller.
         return result
@@ -959,49 +989,50 @@ class view(object):
     # Methods wrapping the window visibility and its scope
     def create(self, position, ratio):
         """Create window for buffer"""
-        builtins = __incpy__.builtins
+        builtins, buffer = __incpy__.builtins, self.buffer
 
         # FIXME: creating a view in another tab is not supported yet
-        result = self.buffer
-
-        if __incpy__.internal.buffer.number(result.number) == -1:
-            raise builtins.Exception("Buffer {:d} does not exist".format(result.number))
+        if __incpy__.internal.buffer.number(buffer.number) == -1:
+            raise builtins.Exception("Buffer {:d} does not exist".format(buffer.number))
         if 1.0 <= ratio < 0.0:
             raise builtins.Exception("Specified ratio is out of bounds {!r}".format(ratio))
 
-        current = __incpy__.internal.window.current()
-        return __incpy__.internal.window.create(result.number, position, ratio, self.options, preview=self.preview)
+        # create the window, get its buffer, and update our state with it.
+        window = __incpy__.internal.window.create(buffer.number, position, ratio, self.options, preview=self.preview)
+        self.buffer = __incpy__.vim.eval("winbufnr({:d})".format(window))
+        return window
 
     def show(self, position, ratio):
         """Show window at the specified position if it is not already showing."""
-        builtins = __incpy__.builtins
+        builtins, buffer = __incpy__.builtins, self.buffer
 
         # FIXME: showing a view in another tab is not supported yet
-        result = self.buffer
+        # if buffer does not exist then recreate the fucker
+        if __incpy__.internal.buffer.number(buffer.number) == -1:
+            raise builtins.Exception("Buffer {:d} does not exist".format(buffer.number))
+        # if __incpy__.internal.buffer.window(buffer.number) != -1:
+        #    raise builtins.Exception("Window for {:d} is already showing".format(buffer.number))
 
-        if __incpy__.internal.buffer.number(result.number) == -1:
-            raise builtins.Exception("Buffer {:d} does not exist".format(result.number))
-        # if __incpy__.internal.buffer.window(result.number) != -1:
-        #    raise builtins.Exception("Window for {:d} is already showing".format(result.number))
-
-        return __incpy__.internal.window.show(result.number, position, ratio, self.options, preview=self.preview)
+        window = __incpy__.internal.window.show(buffer.number, position, ratio, self.options, preview=self.preview)
+        self.buffer = __incpy__.vim.eval("winbufnr({:d})".format(window))
+        return window
 
     def hide(self):
         """Hide the window"""
-        builtins = __incpy__.builtins
+        builtins, buffer = __incpy__.builtins, buffer, self.buffer
 
         # FIXME: hiding a view in another tab is not supported yet
-        result = self.buffer
+        if __incpy__.internal.buffer.number(buffer.number) == -1:
+            raise builtins.Exception("Buffer {:d} does not exist".format(buffer.number))
+        if __incpy__.internal.buffer.window(buffer.number) == -1:
+            raise builtins.Exception("Window for {:d} is already hidden".format(buffer.number))
 
-        if __incpy__.internal.buffer.number(result.number) == -1:
-            raise builtins.Exception("Buffer {:d} does not exist".format(result.number))
-        if __incpy__.internal.buffer.window(result.number) == -1:
-            raise builtins.Exception("Window for {:d} is already hidden".format(result.number))
-
-        return __incpy__.internal.window.hide(result.number, preview=self.preview)
+        return __incpy__.internal.window.hide(buffer.number, preview=self.preview)
 
     def __repr__(self):
-        identity = "\"{:s}\"".format(self.buffer.name) if __incpy__.buffer.exists(self.__buffer_name) else "(missing) \"{:s}\"".format(self.__buffer_name)
+        name = self.buffer.name
+        descr = "{:d}".format(name) if isinstance(name, __incpy__.six.integer_types) else "\"{:s}\"".format(name)
+        identity = descr if __incpy__.buffer.exists(self.__buffer_name) else "(missing) {:s}".format(descr)
         if self.preview:
             return "<__incpy__.view buffer:{:d} {:s} preview>".format(self.window, identity)
         return "<__incpy__.view buffer:{:d} {:s}>".format(self.window, identity)
