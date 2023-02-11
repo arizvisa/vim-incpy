@@ -1119,10 +1119,11 @@ endfunction
 
 function! incpy#Evaluate(expr)
     let stripped = s:strip_by_option(g:incpy#EvalStrip, a:expr)
+    let encoded = substitute(stripped, '.', '\=printf("\\x%02x", char2nr(submatch(0)))', 'g')
 
     " Evaluate and emit an expression in the target using the plugin
     call incpy#Show()
-    execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#EvalFormat, "\"\\"), escape(stripped, "\""))
+    execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#EvalFormat, "\"\\"), encoded)
 
     if g:incpy#OutputFollow
         try | call s:windowtail(g:incpy#BufferId) | catch /^Invalid/ | endtry
