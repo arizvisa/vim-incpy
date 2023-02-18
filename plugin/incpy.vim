@@ -405,9 +405,101 @@ function! incpy#SetupCommands()
     command -range PyHelpRange <line1>,<line2>call incpy#Halp(s:selected())
 endfunction
 
-function! s:word_under_cursor()
+function! s:keyword_under_cursor()
     let res = expand("<cexpr>")
     return len(res)? res : expand("<cword>")
+endfunction
+
+function! s:pyexpr_under_cursor()
+    let [cword, l:line, cpos] = [expand("<cexpr>"), getline(line('.')), col('.') - 1]
+
+    " Patterns which are used to find pieces of the expression. We depend on the
+    " iskeyword character set always placing us at the beginning of an identifier.
+    let pattern_conversion = ['-', '+', '~']
+    let pattern_group = ['()', '[]', '{}']
+
+    "" The logic for trying to determine the quotes for a string is pretty screwy.
+    let pattern_string = ['''', '"']
+
+    " Start out by splitting up our pattern group into a list that can be used.
+    let _pattern_begin_list = reduce(pattern_group, { items, pair -> items + [pair[0]] }, [])
+    let _pattern_end_list = reduce(pattern_group, { items, pair -> items + [pair[1]] }, [])
+
+    " Figure out where the beginning of the current expression is at.
+    let rpos = strridx(l:line, cword, cpos)
+    if rpos >= 0 && cpos - rpos < len(cword)
+        let start = strridx(l:line, cword, cpos)
+    else
+        let start = stridx(l:line, cword, cpos)
+    endif
+
+    " If we're at the beginning of a string or a group, then trust what the user gave us.
+    if index(_pattern_begin_list + pattern_string, l:line[cpos]) >= 0
+        let start = cpos
+
+    " Otherwise, use the current expression. But if there's a sign in front, then use it.
+    else
+        let start = (index(pattern_conversion, l:line[start - 1]) < 0)? start : start - 1
+    endif
+
+    " Find the ending (space, quote, terminal-grouping) from `start` and trim spaces for the result.
+    let stop = match(l:line, printf('[[:space:]%s]', join(pattern_string + map(copy(pattern_group), 'printf("\\%s", v:val[1])'), '')), start)
+    let result = trim(l:line[start : stop])
+
+    " If the result is an empty string, then strip quotes and bail with what we fetched.
+    let _pattern_string = join(pattern_string, '')
+    if match(result, printf('^[%s]\+$', pattern_string)) >= 0
+        return trim(result, _pattern_string)
+    endif
+
+    " Otherwise we need to scan for the beginning and ending to determine the quoting type.
+    let prefix = (start > 0)? matchstr(l:line[: start - 1], printf('[%s]\+$', _pattern_string)) : ''
+    let trailer = matchstr(result, printf('[%s]\+$', _pattern_string))
+
+    " If we have a prefix then trust it first. For python if the length >= 3, and it's duplicated,
+    " then we trim it. Otherwise we can just take the first quote type that we found and use that.
+    if len(prefix)
+        if len(prefix < 3) || match(prefix, printf("^[%s]\{3\}", prefix[0])) < 0
+            let [lside, rside] = [prefix[0], prefix[0]]
+        else
+            let [lside, rside] = [prefix[:3], prefix[:3]]
+        endif
+
+        return join([lside, trim(result, _pattern_string), rside], '')
+
+    " If we got a trailer without the prefix, then scan for its terminator and update the result.
+    elseif len(trailer)
+        let qindex = stridx(l:line, trailer, stop + 1)
+        let result = (qindex < 0)? result : join([result, strpart(l:line, stop + 1, qindex)], '')
+    endif
+
+    " Otherwise we count everything... ignoring how they are nested because we're writing fucking vimscript.
+    let counts = {}
+    for pair in pattern_group
+        let counts[pair[0]] = count(result, pair[0])
+        let counts[pair[1]] = count(result, pair[1])
+    endfor
+
+    " If there aren't any begin-group characters, then we can just trim and return it.
+    if reduce(_pattern_begin_list, { total, character -> total + counts[character] }, 0) == 0
+        return trim(result, join(_pattern_end_list, ''))
+    endif
+
+    " Otherwise, we've hit the worst-case and we need to iterate through the result to
+    " collect the order we close the expression with and map them to the right character.
+    let [order, _pattern_group_table] = [[], {}]
+    for pair in pattern_group | let _pattern_group_table[pair[0]] = pair[1] | endfor
+
+    " Push them onto a stack instead of appending to a list in order to save a reverse.
+    for character in result
+        if index(_pattern_begin_list, character) >= 0
+            let order = [_pattern_group_table[character]] + order
+        endif
+    endfor
+
+    " Now we can trim and append the determined order to our result.
+    let trimmed = trim(result, join(_pattern_end_list, ''), 2)
+    return join([trimmed, join(order, '')], '')
 endfunction
 
 function! incpy#SetupKeys()
@@ -416,18 +508,18 @@ function! incpy#SetupKeys()
     vnoremap ! :PyRange<C-M>
 
     " Python visual and normal mode mappings
-    nnoremap <C-/> :call incpy#Evaluate(<SID>word_under_cursor())<C-M>
+    nnoremap <C-/> :call incpy#Evaluate(<SID>pyexpr_under_cursor())<C-M>
     vnoremap <C-/> :PyEvalRange<C-M>
 
-    nnoremap <C-\> :call incpy#Evaluate(<SID>word_under_cursor())<C-M>
+    nnoremap <C-\> :call incpy#Evaluate(<SID>pyexpr_under_cursor())<C-M>
     vnoremap <C-\> :PyEvalRange<C-M>
 
     " Normal and visual mode mappings for windows
-    nnoremap <C-@> :call incpy#Halp(<SID>word_under_cursor())<C-M>
+    nnoremap <C-@> :call incpy#Halp(<SID>keyword_under_cursor())<C-M>
     vnoremap <C-@> :PyHelpRange<C-M>
 
     " Normal and visual mode mappings for everything else
-    nnoremap <C-S-@> :call incpy#Halp(<SID>word_under_cursor())<C-M>
+    nnoremap <C-S-@> :call incpy#Halp(<SID>keyword_under_cursor())<C-M>
     vnoremap <C-S-@> :PyHelpRange<C-M>
 endfunction
 
