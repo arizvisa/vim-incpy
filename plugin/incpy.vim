@@ -508,10 +508,10 @@ function! incpy#SetupKeys()
     vnoremap ! :PyRange<C-M>
 
     " Python visual and normal mode mappings
-    nnoremap <C-/> :call incpy#Evaluate(<SID>pyexpr_under_cursor())<C-M>
+    nnoremap <C-/> :call incpy#Evaluate(<SID>keyword_under_cursor())<C-M>
     vnoremap <C-/> :PyEvalRange<C-M>
 
-    nnoremap <C-\> :call incpy#Evaluate(<SID>pyexpr_under_cursor())<C-M>
+    nnoremap <C-\> :call incpy#Evaluate(<SID>keyword_under_cursor())<C-M>
     vnoremap <C-\> :PyEvalRange<C-M>
 
     " Normal and visual mode mappings for windows
