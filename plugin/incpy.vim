@@ -1004,6 +1004,15 @@ __incpy__.internal = internal; del(internal)
 class view(object):
     """This represents the window associated with a buffer."""
 
+    # Create a fake descriptor that always returns the default encoding.
+    class encoding_descriptor(object):
+        def __init__(self):
+            self.module = __import__('sys')
+        def __get__(self, obj, type=None):
+            return self.module.getdefaultencoding()
+    encoding = encoding_descriptor()
+    del(encoding_descriptor)
+
     def __init__(self, buffer, opt, preview, tab=None):
         """Create a view for the specified buffer.
 
