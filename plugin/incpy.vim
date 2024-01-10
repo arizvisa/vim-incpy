@@ -1278,12 +1278,14 @@ function! incpy#Range(begin, end)
 
     " If we've got a string, then execute it as a single line.
     if type(code_stripped) == v:t_string
-        execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#ExecFormat, "\"\\"), escape(code_stripped, "\""))
+        let encoded = substitute(printf("(%s)", code_stripped), '.', '\=printf("\\x%02x", char2nr(submatch(0)))', 'g')
+        execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#ExecFormat, "\"\\"), encoded)
 
     " If it was a list, though, then execute our command multiple times.
     elseif type(code_stripped) == v:t_list
         for command_stripped in code_stripped
-            execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#ExecFormat, "\"\\"), escape(command_stripped, "\""))
+            let encoded = substitute(printf("(%s)", command_stripped), '.', '\=printf("\\x%02x", char2nr(submatch(0)))', 'g')
+            execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#ExecFormat, "\"\\"), encoded)
         endfor
 
     " If it's anything else, then we don't support it.
