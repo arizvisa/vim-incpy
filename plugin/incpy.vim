@@ -201,13 +201,14 @@ function! s:striplist_by_option(option, lines)
     elseif type(a:option) == v:t_string
         let result = map(items, a:option)
 
-    "  Otherwise it's a function to use as a transformation
+    " Otherwise it's a function to use as a transformation
     elseif type(a:option) == v:t_func
         let F = a:option
         let result = F(items)
 
+    " Anything else is an unsupported filtering option.
     else
-        throw printf("Unknown filtering option (%s): %s", typename(a:option), a:option)
+        throw printf("Unable to strip lines using an unknown filtering option (%s): %s", typename(a:option), a:option)
     endif
 
     return result
@@ -216,15 +217,18 @@ endfunction
 function! s:stripstring_by_option(option, string)
     if type(a:option) == v:t_bool
         let result = a:option == v:true? trim(a:string) : a:string
+
     elseif type(a:option) == v:t_string
         let expression = a:option
         let results = map([a:string], expression)
         let result = results[0]
+
     elseif type(a:option) == v:t_func
         let F = a:option
         let result = F(a:string)
+
     else
-        throw printf("Unknown filtering option (%s): %s", typename(a:option), a:option)
+        throw printf("Unable to strip string due to an unknown filtering option (%s): %s", typename(a:option), a:option)
     endif
     return result
 endfunction
