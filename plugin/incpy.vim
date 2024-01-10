@@ -1263,11 +1263,33 @@ function! incpy#Range(begin, end)
     let lines = getline(a:begin, a:end)
     let stripped = s:strip_by_option(g:incpy#InputStrip, lines)
 
-    " Execute the lines in our target
-    let code = join(map(stripped, 'escape(v:val, "''\\")'), "\\n")
+    " Escape all single-quotes and backslashes within our string
+    if type(stripped) == v:t_string
+        let code = join(map(split(stripped, "\n"), 'escape(v:val, "''\\")'), '\n')
+
+    " If we received a list of commands to execute, then we can just trust it as-is.
+    elseif type(stripped) == v:t_list
+        let code = stripped
+    endif
+
+    " Strip our output prior to execution
     let code_stripped = s:strip_by_option(g:incpy#ExecStrip, code)
     call incpy#Show()
-    execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#ExecFormat, "\"\\"), escape(code_stripped, "\""))
+
+    " If we've got a string, then execute it as a single line.
+    if type(code_stripped) == v:t_string
+        execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#ExecFormat, "\"\\"), escape(code_stripped, "\""))
+
+    " If it was a list, though, then execute our command multiple times.
+    elseif type(code_stripped) == v:t_list
+        for command_stripped in code_stripped
+            execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#ExecFormat, "\"\\"), escape(command_stripped, "\""))
+        endfor
+
+    " If it's anything else, then we don't support it.
+    else
+        throw printf("Unable to execute due to an unknown input type (%s): %s", typename(code_stripped), code_stripped)
+    endif
 
     " If the user configured us to follow the output, then do as we were told.
     if g:incpy#OutputFollow
