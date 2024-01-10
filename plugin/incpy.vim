@@ -448,9 +448,11 @@ function! incpy#SetupCommands()
     command -range PyRange call incpy#Range(<line1>, <line2>)
 
     command -nargs=1 PyEval call incpy#Evaluate(<q-args>)
-    command -range PyEvalRange <line1>,<line2>call incpy#Evaluate(join(s:selected()))
+    command -range PyEvalRange <line1>,<line2>call incpy#EvaluateRange()
+    command -range PyEvalBlock <line1>,<line2>call incpy#EvaluateBlock()
+    command -range PyEvalSelection call incpy#Evaluate(s:selected())
     command -nargs=1 PyHelp call incpy#Halp(<q-args>)
-    command -range PyHelpRange <line1>,<line2>call incpy#Halp(join(s:selected()))
+    command -range PyHelpSelection <line1>,<line2>call incpy#HalpSelected()
 endfunction
 
 function! s:keyword_under_cursor()
@@ -564,11 +566,11 @@ function! incpy#SetupKeys()
 
     " Normal and visual mode mappings for windows
     nnoremap <C-@> :call incpy#Halp(<SID>keyword_under_cursor())<C-M>
-    vnoremap <C-@> :PyHelpRange<C-M>
+    vnoremap <C-@> :PyHelpSelection<C-M>
 
     " Normal and visual mode mappings for everything else
     nnoremap <C-S-@> :call incpy#Halp(<SID>keyword_under_cursor())<C-M>
-    vnoremap <C-S-@> :PyHelpRange<C-M>
+    vnoremap <C-S-@> :PyHelpSelection<C-M>
 endfunction
 
 "" Define the whole python interface for the plugin
@@ -1282,6 +1284,14 @@ function! incpy#Evaluate(expr)
     endif
 endfunction
 
+function! incpy#EvaluateRange() range
+    return incpy#Evaluate(join(s:selected_range()))
+endfunction
+
+function! incpy#EvaluateBlock() range
+    return incpy#Evaluate(join(s:selected_block()))
+endfunction
+
 function! incpy#Halp(expr)
     " Remove all encompassing whitespace from expression
     let LetMeSeeYouStripped = substitute(a:expr, '^[ \t\n]\+\|[ \t\n]\+$', '', 'g')
@@ -1289,6 +1299,10 @@ function! incpy#Halp(expr)
     " Execute g:incpy#HelpFormat in the target using the plugin's cached communicator
     call incpy#Show()
     execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#HelpFormat, "\"\\"), escape(LetMeSeeYouStripped, "\"\\"))
+endfunction
+
+function! incpy#HalpSelected() range
+    return incpy#Halp(join(s:selected()))
 endfunction
 
 """ Actual execution and setup of the plugin
