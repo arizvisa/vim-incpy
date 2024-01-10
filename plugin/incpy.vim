@@ -639,7 +639,8 @@ class interpreter_python_internal(__incpy__.interpreter):
         if __incpy__.vim.gvars['incpy#Echo'] and not silent:
             echoformat = __incpy__.vim.gvars['incpy#EchoFormat']
             lines = data.split('\n')
-            trimmed = sum(1 for item in lines[::-1] if not item.strip())
+            iterable = (index for index, item in enumerate(lines[::-1]) if item.strip())
+            trimmed = next(iterable, 0)
             echo = '\n'.join(map(echoformat.format, lines[:-trimmed] if trimmed > 0 else lines))
             self.write(echonewline.format(echo))
         __incpy__.six.exec_(data, __incpy__.builtins.globals())
@@ -691,7 +692,8 @@ class interpreter_external(__incpy__.interpreter):
         if __incpy__.vim.gvars['incpy#Echo'] and not silent:
             echoformat = __incpy__.vim.gvars['incpy#EchoFormat']
             lines = data.split('\n')
-            trimmed = sum(1 for item in lines[::-1] if not item.strip())
+            iterable = (index for index, item in enumerate(lines[::-1]) if item.strip())
+            trimmed = next(iterable, 0)
             echo = '\n'.join(map(echoformat.format, lines[:-trimmed] if trimmed > 0 else lines))
             self.write(echonewline.format(echo))
         self.instance.write(data)
@@ -772,7 +774,8 @@ class interpreter_terminal(__incpy__.interpreter_external):
         if __incpy__.vim.gvars['incpy#Echo'] and not silent:
             echoformat = __incpy__.vim.gvars['incpy#EchoFormat']
             lines = data.split('\n')
-            trimmed = sum(1 for item in lines[::-1] if not item.strip())
+            iterable = (index for index, item in enumerate(lines[::-1]) if item.strip())
+            trimmed = next(iterable, 0)
 
             # Terminals don't let you modify or edit the buffer in any way
             #echo = '\n'.join(map(echoformat.format, lines[:-trimmed] if trimmed > 0 else lines))
