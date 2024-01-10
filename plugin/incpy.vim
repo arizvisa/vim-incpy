@@ -181,13 +181,13 @@ function! s:python_strip_and_fix_indent(lines)
     endfor
 
     " if the last line is indented, then we append another newline (python)
-    let trimmed = stripped[l:start : -l:tail]
-    if len(trimmed) > 0
-        let result = trimmed[-1] =~ '^\s\+'? trimmed + [''] : trimmed
+    let trimmed = split(trim(join(stripped[l:start : -l:tail], "\n"), " \t\n", 2), "\n")
+    if len(trimmed) > 0 && trimmed[-1] =~ '^\s\+'
+        let result = add(trimmed, '')
     else
         let result = trimmed
     endif
-    return result
+    return join(result, "\n") .. "\n"
 endfunction
 
 function! s:striplist_by_option(option, lines)
