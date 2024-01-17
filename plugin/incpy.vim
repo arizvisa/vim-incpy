@@ -1261,19 +1261,15 @@ endfunction
 function! incpy#Range(begin, end)
     " Execute the specified lines in the target
     let lines = getline(a:begin, a:end)
-    let stripped = s:strip_by_option(g:incpy#InputStrip, lines)
+    let input_stripped = s:strip_by_option(g:incpy#InputStrip, lines)
 
-    " Escape all single-quotes and backslashes within our string
-    if type(stripped) == v:t_string
-        let code = join(map(split(stripped, "\n"), 'escape(v:val, "''\\")'), '\n')
-
-    " If we received a list of commands to execute, then we can just trust it as-is.
-    elseif type(stripped) == v:t_list
-        let code = stripped
+    " Verify that the input returned is a type that we support
+    if index([v:t_string, v:t_list], type(input_stripped)) < 0
+        throw printf("Unable to process the given input due to it being of an unsupported type (%s): %s", typename(input_stripped), input_stripped)
     endif
 
-    " Strip our output prior to execution
-    let code_stripped = s:strip_by_option(g:incpy#ExecStrip, code)
+    " Strip our input prior to its execution.
+    let code_stripped = s:strip_by_option(g:incpy#ExecStrip, input_stripped)
     call incpy#Show()
 
     " If we've got a string, then execute it as a single line.
