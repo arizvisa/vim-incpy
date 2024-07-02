@@ -1,6 +1,5 @@
 import sys, builtins, six, logging
-from . import incpy, interface
-from .incpy import buffer, spawn
+from . import incpy, interface, process
 
 internal = interface.internal
 vim = interface.vim
@@ -33,8 +32,8 @@ class interpreter(object):
 
     def __repr__(self):
         if self.view.window > -1:
-            return "<__incpy__.{:s} buffer:{:d}>".format(self.__class__.__name__, self.view.buffer.number)
-        return "<__incpy__.{:s} buffer:{:d} hidden>".format(self.__class__.__name__, self.view.buffer.number)
+            return "<{:s} buffer:{:d}>".format(self.__class__.__name__, self.view.buffer.number)
+        return "<{:s} buffer:{:d} hidden>".format(self.__class__.__name__, self.view.buffer.number)
 
     def attach(self):
         """Attaches interpreter to view"""
@@ -123,7 +122,7 @@ class interpreter_external(interpreter):
 
     def attach(self):
         logger.debug("connecting i/o from {!r} to {!r}".format(self.command, self.view))
-        self.instance = spawn(self.view.write, self.command, **self.options)
+        self.instance = process.spawn(self.view.write, self.command, **self.options)
         logger.info("started process {:d} ({:#x}): {:s}".format(self.instance.id, self.instance.id, self.command))
 
         self.state = logger,
@@ -274,26 +273,26 @@ class interpreter_terminal(interpreter_external):
         return
 
 # spawn interpreter requested by user
-_ = __incpy__.vim.gvars["incpy#Program"]
-opt = {'winfixwidth':True, 'winfixheight':True} if __incpy__.vim.gvars["incpy#WindowFixed"] > 0 else {}
+_ = interface.vim.gvars["incpy#Program"]
+opt = {'winfixwidth':True, 'winfixheight':True} if interface.vim.gvars["incpy#WindowFixed"] > 0 else {}
 try:
-    if __incpy__.vim.eval('has("terminal")') and len(_) > 0:
-        __incpy__.cache = __incpy__.interpreter_terminal.new(_, opt=opt)
+    if interface.vim.eval('has("terminal")') and len(_) > 0:
+        cache = interpreter_terminal.new(_, opt=opt)
     elif len(_) > 0:
-        __incpy__.cache = __incpy__.interpreter_external.new(_, opt=opt)
+        cache = interpreter_external.new(_, opt=opt)
     else:
-        __incpy__.cache = __incpy__.interpreter_python_internal.new(opt=opt)
+        cache = interpreter_python_internal.new(opt=opt)
 
 except Exception:
-    __incpy__.logger.fatal("error starting external interpreter: {:s}".format(_), exc_info=True)
-    __incpy__.logger.warning("falling back to internal python interpreter")
-    __incpy__.cache = __incpy__.interpreter_python_internal.new(opt=opt)
+    logger.fatal("error starting external interpreter: {:s}".format(_), exc_info=True)
+    logger.warning("falling back to internal python interpreter")
+    cache = interpreter_python_internal.new(opt=opt)
 del(opt)
 
 # create it's window, and store the buffer's id
-view = __incpy__.cache.view
-__incpy__.vim.gvars['incpy#BufferId'] = view.buffer.number
-view.create(__incpy__.vim.gvars['incpy#WindowPosition'], __incpy__.vim.gvars['incpy#WindowRatio'])
+view = cache.view
+interface.vim.gvars['incpy#BufferId'] = view.buffer.number
+view.create(interface.vim.gvars['incpy#WindowPosition'], interface.vim.gvars['incpy#WindowRatio'])
 
 # delete our temp variable
 del(view)
