@@ -6,7 +6,11 @@ from . import integer_types, string_types
 try:
     import vim as _vim
 
-    # vim wrapper
+except ImportError:
+    logger.warning('unable to import the vim module for python-vim. skipping the definition of its wrappers.')
+
+# vim wrapper
+else:
     class vim(object):
         try:
             import collections.abc as collections
@@ -185,303 +189,299 @@ try:
                 caller.__name__ = name
                 return caller
 
-    # fd-like wrapper around vim buffer object
-    class buffer(object):
-        """vim buffer management"""
+        class tab(object):
+            """Internal vim commands for interacting with tabs"""
+            goto = staticmethod(lambda n: vim.command("tabnext {:d}".format(1 + n)))
+            close = staticmethod(lambda n: vim.command("tabclose {:d}".format(1 + n)))
+            #def move(n, t):    # FIXME
+            #    current = int(vim.eval('tabpagenr()'))
+            #    _ = t if current == n else current if t > current else current + 1
+            #    vim.command("tabnext {:d} | tabmove {:d} | tabnext {:d}".format(1 + n, t, _))
 
-        # Scope of the buffer instance
-        def __init__(self, buffer):
-            if type(buffer) != type(vim.current.buffer):
-                raise AssertionError
-            self.buffer = buffer
-            #self.writing = threading.Lock()
+            getCurrent = staticmethod(lambda: int(vim.eval('tabpagenr()')) - 1)
+            getCount = staticmethod(lambda: int(vim.eval('tabpagenr("$")')))
+            getBuffers = staticmethod(lambda n: [ int(item) for item in vim.eval("tabpagebuflist({:d})".format(n - 1)) ])
 
-        def close(cls):
-            # if vim is going down, then it will crash trying to do anything
-            # with python...so if it is, don't try to clean up.
-            if vim.vvars['dying']:
-                return
-            vim.command("silent! bdelete! {:d}".format(self.buffer.number))
+            getWindowCurrent = staticmethod(lambda n: int(vim.eval("tabpagewinnr({:d})".format(n - 1))))
+            getWindowPrevious = staticmethod(lambda n: int(vim.eval("tabpagewinnr({:d}, '#')".format(n - 1))))
+            getWindowCount = staticmethod(lambda n: int(vim.eval("tabpagewinnr({:d}, '$')".format(n - 1))))
 
-        # Creating a buffer from various inputs
-        @classmethod
-        def new(cls, name):
-            """Create a new incpy.buffer object named `name`."""
-            vim.command("silent! badd {:s}".format(name))
+        class buffer(object):
+            """Internal vim commands for getting information about a buffer"""
+            name = staticmethod(lambda id: str(vim.eval("bufname({!s})".format(id))))
+            number = staticmethod(lambda id: int(vim.eval("bufnr({!s})".format(id))))
+            window = staticmethod(lambda id: int(vim.eval("bufwinnr({!s})".format(id))))
+            exists = staticmethod(lambda id: bool(vim.eval("bufexists({!s})".format(id))))
+            new = staticmethod(lambda name: buffer.new(name))
+            of = staticmethod(lambda id: buffer.of(id))
 
-            # Now that the buffer has been added, we can try and fetch it by name
-            return cls.of(name)
+        class window(object):
+            """Internal vim commands for doing things with a window"""
 
-        @classmethod
-        def exists(cls, identity):
-            '''Return a boolean on whether a buffer of the specified `identity` exists.'''
+            # ui position conversion
+            @staticmethod
+            def positionToLocation(position):
+                if position in {'left', 'above'}:
+                    return 'leftabove'
+                if position in {'right', 'below'}:
+                    return 'rightbelow'
+                raise ValueError(position)
 
-            # If we got a vim.buffer, then it exists because the user
-            # has given us a reference ot it.
-            if isinstance(identity, _vim.Buffer):
-                return True
+            @staticmethod
+            def positionToSplit(position):
+                if position in {'left', 'right'}:
+                    return 'vsplit'
+                if position in {'above', 'below'}:
+                    return 'split'
+                raise ValueError(position)
 
-            # Create some closures that we can use to verify the buffer
-            # matches what the user asked for.
-            def match_name(buffer):
-                return buffer.name is not None and buffer.name.endswith(identity)
-            def match_id(buffer):
-                return buffer.number == identity
+            @staticmethod
+            def optionsToCommandLine(options):
+                result = []
+                for k, v in options.items():
+                    if isinstance(v, string_types):
+                        result.append("{:s}={:s}".format(k, v))
+                    elif isinstance(v, bool):
+                        result.append("{:s}{:s}".format('' if v else 'no', k))
+                    elif isinstance(v, integer_types):
+                        result.append("{:s}={:d}".format(k, v))
+                    else:
+                        raise NotImplementedError(k, v)
+                    continue
+                return '\\ '.join(result)
 
-            # Figure out which closure we need to use based on the parameter type
-            if isinstance(identity, string_types):
-                res, match = "'{:s}'".format(identity.replace("'", "''")), match_name
+            # window selection
+            @staticmethod
+            def current():
+                '''return the current window number'''
+                return int(vim.eval('winnr()'))
 
-            elif isinstance(identity, integer_types):
-                res, match = "{:d}".format(identity), match_id
+            @staticmethod
+            def select(window):
+                '''Select the window with the specified window number'''
+                return (int(vim.eval('winnr()')), vim.command("{:d} wincmd w".format(window)))[0]
 
-            else:
-                raise vim.error("Unable to identify buffer due to invalid parameter type : {!s}".format(identity))
+            @staticmethod
+            def currentsize(position):
+                if position in ('left', 'right'):
+                    return int(vim.eval('&columns'))
+                if position in ('above', 'below'):
+                    return int(vim.eval('&lines'))
+                raise ValueError(position)
 
-            # Now we just need to ask vim if the buffer exists and return it
-            return bool(vim.eval("bufexists({!s})".format(res)))
+            # properties
+            @staticmethod
+            def buffer(window):
+                '''Return the bufferid for the specified window'''
+                return int(vim.eval("winbufnr({:d})".format(window)))
 
-        @classmethod
-        def of(cls, identity):
-            """Return an incpy.buffer object with the specified `identity` which can be either a name or id number."""
+            @staticmethod
+            def available(bufferid):
+                '''Return the first window number for a buffer id'''
+                return int(vim.eval("bufwinnr({:d})".format(bufferid)))
 
-            # If we were already given a vim.buffer instance, then there's
-            # really nothing for us to actually do.
-            if isinstance(identity, _vim.Buffer):
-                return cls(identity)
+            # window actions
+            @classmethod
+            def create(cls, bufferid, position, ratio, options, preview=False):
+                '''create a window for the bufferid and return its number'''
+                last = cls.current()
 
-            # Create some matcher callables that we can search with
-            def match_name(buffer):
-                return buffer.name is not None and buffer.name.endswith(identity)
-            def match_id(buffer):
-                return buffer.number == identity
-
-            # Figure out which matcher type we need to use based on the type
-            if isinstance(identity, string_types):
-                res, match = "'{:s}'".format(identity.replace("'", "''")), match_name
-
-            elif isinstance(identity, integer_types):
-                res, match = "{:d}".format(identity), match_id
-
-            else:
-                raise vim.error("Unable to determine buffer from parameter type : {!s}".format(identity))
-
-            # If we iterated through everything, then we didn't find a match
-            if not vim.eval("bufexists({!s})".format(res)):
-                raise vim.error("Unable to find buffer from parameter : {!s}".format(identity))
-
-            # Iterate through all our buffers finding the first one that matches
-            try:
-                # FIXME: It sucks that this is O(n), but what else can we do?
-                buf = next(buffer for buffer in vim.buffers if match(buffer))
-
-            # If we iterated through everything, then we didn't find a match
-            except StopIteration:
-                raise vim.error("Unable to find buffer from parameter : {!s}".format(identity))
-
-            # Now we can construct our class using the buffer we found
-            else:
-                return cls(buf)
-
-        # Properties
-        name = property(fget=lambda self: self.buffer.name)
-        number = property(fget=lambda self: self.buffer.number)
-
-        def __repr__(self):
-            return "<incpy.buffer {:d} \"{:s}\">".format(self.number, self.name)
-
-        # Editing buffer the buffer in-place
-        def write(self, data):
-            result = iter(data.split('\n'))
-            self.buffer[-1] += next(result)
-            [ self.buffer.append(item) for item in result ]
-
-        def clear(self):
-            self.buffer[:] = ['']
-
-except ImportError:
-    logger.warning('unable to import the vim module for python-vim. skipping the definition of its wrappers.')
-
-# vim internal
-class internal(object):
-    """Commands that interface with vim directly"""
-
-    class tab(object):
-        """Internal vim commands for interacting with tabs"""
-        goto = staticmethod(lambda n: vim.command("tabnext {:d}".format(1 + n)))
-        close = staticmethod(lambda n: vim.command("tabclose {:d}".format(1 + n)))
-        #def move(n, t):    # FIXME
-        #    current = int(vim.eval('tabpagenr()'))
-        #    _ = t if current == n else current if t > current else current + 1
-        #    vim.command("tabnext {:d} | tabmove {:d} | tabnext {:d}".format(1 + n, t, _))
-
-        getCurrent = staticmethod(lambda: int(vim.eval('tabpagenr()')) - 1)
-        getCount = staticmethod(lambda: int(vim.eval('tabpagenr("$")')))
-        getBuffers = staticmethod(lambda n: [ int(item) for item in vim.eval("tabpagebuflist({:d})".format(n - 1)) ])
-
-        getWindowCurrent = staticmethod(lambda n: int(vim.eval("tabpagewinnr({:d})".format(n - 1))))
-        getWindowPrevious = staticmethod(lambda n: int(vim.eval("tabpagewinnr({:d}, '#')".format(n - 1))))
-        getWindowCount = staticmethod(lambda n: int(vim.eval("tabpagewinnr({:d}, '$')".format(n - 1))))
-
-    class buffer(object):
-        """Internal vim commands for getting information about a buffer"""
-        name = staticmethod(lambda id: str(vim.eval("bufname({!s})".format(id))))
-        number = staticmethod(lambda id: int(vim.eval("bufnr({!s})".format(id))))
-        window = staticmethod(lambda id: int(vim.eval("bufwinnr({!s})".format(id))))
-        exists = staticmethod(lambda id: bool(vim.eval("bufexists({!s})".format(id))))
-        new = staticmethod(buffer.new)
-        of = staticmethod(buffer.of)
-
-    class window(object):
-        """Internal vim commands for doing things with a window"""
-
-        # ui position conversion
-        @staticmethod
-        def positionToLocation(position):
-            if position in {'left', 'above'}:
-                return 'leftabove'
-            if position in {'right', 'below'}:
-                return 'rightbelow'
-            raise ValueError(position)
-
-        @staticmethod
-        def positionToSplit(position):
-            if position in {'left', 'right'}:
-                return 'vsplit'
-            if position in {'above', 'below'}:
-                return 'split'
-            raise ValueError(position)
-
-        @staticmethod
-        def optionsToCommandLine(options):
-            result = []
-            for k, v in options.items():
-                if isinstance(v, string_types):
-                    result.append("{:s}={:s}".format(k, v))
-                elif isinstance(v, bool):
-                    result.append("{:s}{:s}".format('' if v else 'no', k))
-                elif isinstance(v, integer_types):
-                    result.append("{:s}={:d}".format(k, v))
+                size = cls.currentsize(position) * ratio
+                if preview:
+                    if len(options) > 0:
+                        vim.command("noautocmd silent {:s} pedit! +setlocal\\ {:s} {:s}".format(cls.positionToLocation(position), cls.optionsToCommandLine(options), vim.buffer.name(bufferid)))
+                    else:
+                        vim.command("noautocmd silent {:s} pedit! {:s}".format(cls.positionToLocation(position), vim.buffer.name(bufferid)))
                 else:
-                    raise NotImplementedError(k, v)
-                continue
-            return '\\ '.join(result)
+                    if len(options) > 0:
+                        vim.command("noautocmd silent {:s} {:d}{:s}! +setlocal\\ {:s} {:s}".format(cls.positionToLocation(position), int(size), cls.positionToSplit(position), cls.optionsToCommandLine(options), vim.buffer.name(bufferid)))
+                    else:
+                        vim.command("noautocmd silent {:s} {:d}{:s}! {:s}".format(cls.positionToLocation(position), int(size), cls.positionToSplit(position), vim.buffer.name(bufferid)))
 
-        # window selection
-        @staticmethod
-        def current():
-            '''return the current window number'''
-            return int(vim.eval('winnr()'))
+                # grab the newly created window
+                new = cls.current()
+                try:
+                    if bool(vim.gvars['incpy#WindowPreview']):
+                        return new
 
-        @staticmethod
-        def select(window):
-            '''Select the window with the specified window number'''
-            return (int(vim.eval('winnr()')), vim.command("{:d} wincmd w".format(window)))[0]
+                    newbufferid = cls.buffer(new)
+                    if bufferid > 0 and newbufferid == bufferid:
+                        return new
 
-        @staticmethod
-        def currentsize(position):
-            if position in ('left', 'right'):
-                return int(vim.eval('&columns'))
-            if position in ('above', 'below'):
-                return int(vim.eval('&lines'))
-            raise ValueError(position)
+                    # if the bufferid doesn't exist, then we have to recreate one.
+                    if vim.eval("bufnr({:d})".format(bufferid)) < 0:
+                        raise Exception("The requested buffer ({:d}) does not exist and will need to be created.".format(bufferid))
 
-        # properties
-        @staticmethod
-        def buffer(window):
-            '''Return the bufferid for the specified window'''
-            return int(vim.eval("winbufnr({:d})".format(window)))
+                    # if our new bufferid doesn't match the requested one, then we switch to it.
+                    elif newbufferid != bufferid:
+                        vim.command("buffer {:d}".format(bufferid))
+                        logger.debug("Adjusted buffer ({:d}) for window {:d} to point to the correct buffer id ({:d})".format(newbufferid, new, bufferid))
 
-        @staticmethod
-        def available(bufferid):
-            '''Return the first window number for a buffer id'''
-            return int(vim.eval("bufwinnr({:d})".format(bufferid)))
+                finally:
+                    cls.select(last)
+                return new
 
-        # window actions
-        @classmethod
-        def create(cls, bufferid, position, ratio, options, preview=False):
-            '''create a window for the bufferid and return its number'''
-            last = cls.current()
+            @classmethod
+            def show(cls, bufferid, position, ratio, options, preview=False):
+                '''return the window for the bufferid, recreating it if its now showing'''
+                window = cls.available(bufferid)
 
-            size = cls.currentsize(position) * ratio
-            if preview:
-                if len(options) > 0:
-                    vim.command("noautocmd silent {:s} pedit! +setlocal\\ {:s} {:s}".format(cls.positionToLocation(position), cls.optionsToCommandLine(options), internal.buffer.name(bufferid)))
+                # if we already have a windowid for the buffer, then we can return it. otherwise
+                # we rec-reate the window which should get the buffer to work.
+                return window if window > 0 else cls.create(bufferid, position, ratio, options, preview=preview)
+
+            @classmethod
+            def hide(cls, bufferid, preview=False):
+                last = cls.select(cls.buffer(bufferid))
+                if preview:
+                    vim.command("noautocmd silent pclose!")
                 else:
-                    vim.command("noautocmd silent {:s} pedit! {:s}".format(cls.positionToLocation(position), internal.buffer.name(bufferid)))
-            else:
-                if len(options) > 0:
-                    vim.command("noautocmd silent {:s} {:d}{:s}! +setlocal\\ {:s} {:s}".format(cls.positionToLocation(position), int(size), cls.positionToSplit(position), cls.optionsToCommandLine(options), internal.buffer.name(bufferid)))
-                else:
-                    vim.command("noautocmd silent {:s} {:d}{:s}! {:s}".format(cls.positionToLocation(position), int(size), cls.positionToSplit(position), internal.buffer.name(bufferid)))
+                    vim.command("noautocmd silent close!")
+                return cls.select(last)
 
-            # grab the newly created window
-            new = cls.current()
-            try:
-                if bool(vim.gvars['incpy#WindowPreview']):
-                    return new
-
-                newbufferid = cls.buffer(new)
-                if bufferid > 0 and newbufferid == bufferid:
-                    return new
-
-                # if the bufferid doesn't exist, then we have to recreate one.
-                if vim.eval("bufnr({:d})".format(bufferid)) < 0:
-                    raise Exception("The requested buffer ({:d}) does not exist and will need to be created.".format(bufferid))
-
-                # if our new bufferid doesn't match the requested one, then we switch to it.
-                elif newbufferid != bufferid:
-                    vim.command("buffer {:d}".format(bufferid))
-                    logger.debug("Adjusted buffer ({:d}) for window {:d} to point to the correct buffer id ({:d})".format(newbufferid, new, bufferid))
-
-            finally:
+            # window state
+            @classmethod
+            def saveview(cls, bufferid):
+                last = cls.select( cls.buffer(bufferid) )
+                res = vim.eval('winsaveview()')
                 cls.select(last)
-            return new
+                return res
 
-        @classmethod
-        def show(cls, bufferid, position, ratio, options, preview=False):
-            '''return the window for the bufferid, recreating it if its now showing'''
-            window = cls.available(bufferid)
+            @classmethod
+            def restview(cls, bufferid, state):
+                do = vim.Function('winrestview')
+                last = cls.select( cls.buffer(bufferid) )
+                do(state)
+                cls.select(last)
 
-            # if we already have a windowid for the buffer, then we can return it. otherwise
-            # we rec-reate the window which should get the buffer to work.
-            return window if window > 0 else cls.create(bufferid, position, ratio, options, preview=preview)
+            @classmethod
+            def savesize(cls, bufferid):
+                last = cls.select( cls.buffer(bufferid) )
+                w, h = map(vim.eval, ['winwidth(0)', 'winheight(0)'])
+                cls.select(last)
+                return { 'width':w, 'height':h }
 
-        @classmethod
-        def hide(cls, bufferid, preview=False):
-            last = cls.select(cls.buffer(bufferid))
-            if preview:
-                vim.command("noautocmd silent pclose!")
-            else:
-                vim.command("noautocmd silent close!")
-            return cls.select(last)
+            @classmethod
+            def restsize(cls, bufferid, state):
+                window = cls.buffer(bufferid)
+                return "vertical {:d} resize {:d} | {:d} resize {:d}".format(window, state['width'], window, state['height'])
 
-        # window state
-        @classmethod
-        def saveview(cls, bufferid):
-            last = cls.select( cls.buffer(bufferid) )
-            res = vim.eval('winsaveview()')
-            cls.select(last)
-            return res
+# XXX: placeholder for modules that still depend on "internal" to access buffers, windows, and tabs.
+internal = vim
 
-        @classmethod
-        def restview(cls, bufferid, state):
-            do = vim.Function('winrestview')
-            last = cls.select( cls.buffer(bufferid) )
-            do(state)
-            cls.select(last)
+# fd-like wrapper around vim buffer object
+class buffer(object):
+    """vim buffer management"""
 
-        @classmethod
-        def savesize(cls, bufferid):
-            last = cls.select( cls.buffer(bufferid) )
-            w, h = map(vim.eval, ['winwidth(0)', 'winheight(0)'])
-            cls.select(last)
-            return { 'width':w, 'height':h }
+    # Scope of the buffer instance
+    def __init__(self, buffer):
+        if type(buffer) != type(vim.current.buffer):
+            raise AssertionError
+        self.buffer = buffer
+        #self.writing = threading.Lock()
 
-        @classmethod
-        def restsize(cls, bufferid, state):
-            window = cls.buffer(bufferid)
-            return "vertical {:d} resize {:d} | {:d} resize {:d}".format(window, state['width'], window, state['height'])
+    def close(cls):
+        # if vim is going down, then it will crash trying to do anything
+        # with python...so if it is, don't try to clean up.
+        if vim.vvars['dying']:
+            return
+        vim.command("silent! bdelete! {:d}".format(self.buffer.number))
+
+    # Creating a buffer from various inputs
+    @classmethod
+    def new(cls, name):
+        """Create a new incpy.buffer object named `name`."""
+        vim.command("silent! badd {:s}".format(name))
+
+        # Now that the buffer has been added, we can try and fetch it by name
+        return cls.of(name)
+
+    @classmethod
+    def exists(cls, identity):
+        '''Return a boolean on whether a buffer of the specified `identity` exists.'''
+
+        # If we got a vim.buffer, then it exists because the user
+        # has given us a reference ot it.
+        if isinstance(identity, _vim.Buffer):
+            return True
+
+        # Create some closures that we can use to verify the buffer
+        # matches what the user asked for.
+        def match_name(buffer):
+            return buffer.name is not None and buffer.name.endswith(identity)
+        def match_id(buffer):
+            return buffer.number == identity
+
+        # Figure out which closure we need to use based on the parameter type
+        if isinstance(identity, string_types):
+            res, match = "'{:s}'".format(identity.replace("'", "''")), match_name
+
+        elif isinstance(identity, integer_types):
+            res, match = "{:d}".format(identity), match_id
+
+        else:
+            raise vim.error("Unable to identify buffer due to invalid parameter type : {!s}".format(identity))
+
+        # Now we just need to ask vim if the buffer exists and return it
+        return bool(vim.eval("bufexists({!s})".format(res)))
+
+    @classmethod
+    def of(cls, identity):
+        """Return an incpy.buffer object with the specified `identity` which can be either a name or id number."""
+
+        # If we were already given a vim.buffer instance, then there's
+        # really nothing for us to actually do.
+        if isinstance(identity, _vim.Buffer):
+            return cls(identity)
+
+        # Create some matcher callables that we can search with
+        def match_name(buffer):
+            return buffer.name is not None and buffer.name.endswith(identity)
+        def match_id(buffer):
+            return buffer.number == identity
+
+        # Figure out which matcher type we need to use based on the type
+        if isinstance(identity, string_types):
+            res, match = "'{:s}'".format(identity.replace("'", "''")), match_name
+
+        elif isinstance(identity, integer_types):
+            res, match = "{:d}".format(identity), match_id
+
+        else:
+            raise vim.error("Unable to determine buffer from parameter type : {!s}".format(identity))
+
+        # If we iterated through everything, then we didn't find a match
+        if not vim.eval("bufexists({!s})".format(res)):
+            raise vim.error("Unable to find buffer from parameter : {!s}".format(identity))
+
+        # Iterate through all our buffers finding the first one that matches
+        try:
+            # FIXME: It sucks that this is O(n), but what else can we do?
+            buf = next(buffer for buffer in vim.buffers if match(buffer))
+
+        # If we iterated through everything, then we didn't find a match
+        except StopIteration:
+            raise vim.error("Unable to find buffer from parameter : {!s}".format(identity))
+
+        # Now we can construct our class using the buffer we found
+        else:
+            return cls(buf)
+
+    # Properties
+    name = property(fget=lambda self: self.buffer.name)
+    number = property(fget=lambda self: self.buffer.number)
+
+    def __repr__(self):
+        return "<incpy.buffer {:d} \"{:s}\">".format(self.number, self.name)
+
+    # Editing buffer the buffer in-place
+    def write(self, data):
+        result = iter(data.split('\n'))
+        self.buffer[-1] += next(result)
+        [ self.buffer.append(item) for item in result ]
+
+    def clear(self):
+        self.buffer[:] = ['']
 
 # view -- window <-> buffer
 class view(object):
@@ -506,7 +506,7 @@ class view(object):
 
         # Get the vim.buffer from the buffer the caller gave us.
         try:
-            buf = internal.buffer.of(bufnum)
+            buf = vim.buffer.of(bufnum)
 
         # If we couldn't find the desired buffer, then we'll just create one
         # with the name that we were given.
@@ -515,9 +515,9 @@ class view(object):
             # Create a buffer with the specified name. This is not really needed
             # as we're only creating it to sneak off with the buffer's name.
             if isinstance(bufnum, string_types):
-                buf = internal.buffer.new(bufnum)
+                buf = vim.buffer.new(bufnum)
             elif isinstance(bufnum, integer_types):
-                buf = internal.buffer.new(vim.gvars['incpy#WindowName'])
+                buf = vim.buffer.new(vim.gvars['incpy#WindowName'])
             else:
                 raise vim.error("Unable to determine output buffer name from parameter : {!r}".format(bufnum))
 
@@ -533,7 +533,7 @@ class view(object):
 
         # Find the buffer by the name that was previously cached.
         try:
-            result = internal.buffer.of(name)
+            result = vim.buffer.of(name)
 
         # If we got an exception when trying to snag the buffer by its name, then
         # log the exception and create a new one to take the old one's place.
@@ -542,9 +542,9 @@ class view(object):
 
             # Create a new buffer using the name that we expect it to have.
             if isinstance(name, string_types):
-                result = internal.buffer.new(name)
+                result = vim.buffer.new(name)
             elif isinstance(name, integer_types):
-                result = internal.buffer.new(vim.gvars['incpy#WindowName'])
+                result = vim.buffer.new(vim.gvars['incpy#WindowName'])
             else:
                 raise vim.error("Unable to determine output buffer name from parameter : {!r}".format(name))
 
@@ -563,7 +563,7 @@ class view(object):
     @property
     def window(self):
         result = self.buffer
-        return internal.window.buffer(result.number)
+        return vim.window.buffer(result.number)
 
     def write(self, data):
         """Write data directly into window contents (updating buffer)"""
@@ -576,13 +576,13 @@ class view(object):
         bufobj = self.buffer
 
         # FIXME: creating a view in another tab is not supported yet
-        if internal.buffer.number(bufobj.number) == -1:
+        if vim.buffer.number(bufobj.number) == -1:
             raise Exception("Buffer {:d} does not exist".format(bufobj.number))
         if 1.0 <= ratio < 0.0:
             raise Exception("Specified ratio is out of bounds {!r}".format(ratio))
 
         # create the window, get its buffer, and update our state with it.
-        window = internal.window.create(bufobj.number, position, ratio, self.options, preview=self.preview)
+        window = vim.window.create(bufobj.number, position, ratio, self.options, preview=self.preview)
         self.buffer = vim.eval("winbufnr({:d})".format(window))
         return window
 
@@ -592,12 +592,12 @@ class view(object):
 
         # FIXME: showing a view in another tab is not supported yet
         # if buffer does not exist then recreate the fucker
-        if internal.buffer.number(bufobj.number) == -1:
+        if vim.buffer.number(bufobj.number) == -1:
             raise Exception("Buffer {:d} does not exist".format(bufobj.number))
-        # if internal.buffer.window(bufobj.number) != -1:
+        # if vim.buffer.window(bufobj.number) != -1:
         #    raise Exception("Window for {:d} is already showing".format(bufobj.number))
 
-        window = internal.window.show(bufobj.number, position, ratio, self.options, preview=self.preview)
+        window = vim.window.show(bufobj.number, position, ratio, self.options, preview=self.preview)
         self.buffer = vim.eval("winbufnr({:d})".format(window))
         return window
 
@@ -606,12 +606,12 @@ class view(object):
         bufobj = self.buffer
 
         # FIXME: hiding a view in another tab is not supported yet
-        if internal.buffer.number(bufobj.number) == -1:
+        if vim.buffer.number(bufobj.number) == -1:
             raise Exception("Buffer {:d} does not exist".format(bufobj.number))
-        if internal.buffer.window(bufobj.number) == -1:
+        if vim.buffer.window(bufobj.number) == -1:
             raise Exception("Window for {:d} is already hidden".format(bufobj.number))
 
-        return internal.window.hide(bufobj.number, preview=self.preview)
+        return vim.window.hide(bufobj.number, preview=self.preview)
 
     def __repr__(self):
         name = self.buffer.name
