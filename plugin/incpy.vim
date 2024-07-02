@@ -779,12 +779,16 @@ def generate_package_loaders(module, path):
         'ordinal_types': ordinal_types,
     }
 
+    namespace = {name : value for name, value in version_independent_types.items()}
+    namespace['reraise'] = __import__('six').reraise
+    namespace['exec_'] = __import__('six').exec_
+
     currentscriptpath = path
     files = [filename for filename in os.listdir(currentscriptpath) if filename.endswith('.py')]
     iterable = ((os.path.splitext(filename), os.path.join(currentscriptpath, filename)) for filename in files)
     submodules = {name : path for (name, ext), path in iterable}
     pythonx_finder = vim_plugin_support_finder(currentscriptpath, submodules)
-    yield vim_plugin_packager(module, [pythonx_finder], version_independent_types)
+    yield vim_plugin_packager(module, [pythonx_finder], namespace)
 EOF
 endfunction
 
