@@ -1,29 +1,31 @@
-# create a pseudo-builtin module
-__incpy__ = __builtins__.__class__('__incpy__', 'Internal state module for vim-incpy')
-__incpy__.sys, __incpy__.incpy, __incpy__.builtins, __incpy__.six = __import__('sys'), __import__('incpy'), __import__('builtins'), __import__('six')
-__incpy__.vim, __incpy__.buffer, __incpy__.spawn = __incpy__.incpy.vim, __incpy__.incpy.buffer, __incpy__.incpy.spawn
+import sys, builtins, six, logging
+from . import incpy, interface
+from .incpy import buffer, spawn
+
+internal = interface.internal
+vim = interface.vim
 
 # save initial state
-__incpy__.state = __incpy__.builtins.tuple(__incpy__.builtins.getattr(__incpy__.sys, _) for _ in ['stdin', 'stdout', 'stderr'])
-__incpy__.logger = __import__('logging').getLogger('incpy').getChild('vim')
+state = tuple(getattr(sys, _) for _ in ['stdin', 'stdout', 'stderr'])
+logger = logging.getLogger('incpy').getChild('vim')
 
 # interpreter classes
 class interpreter(object):
     # options that are used for constructing the view
     view_options = ['buffer', 'opt', 'preview', 'tab']
 
-    @__incpy__.builtins.classmethod
+    @classmethod
     def new(cls, **options):
         options.setdefault('buffer', None)
         return cls(**options)
 
     def __init__(self, **kwds):
-        opt = {}.__class__(__incpy__.vim.gvars['incpy#CoreWindowOptions'])
-        opt.update(__incpy__.vim.gvars['incpy#WindowOptions'])
+        opt = {}.__class__(vim.gvars['incpy#CoreWindowOptions'])
+        opt.update(vim.gvars['incpy#WindowOptions'])
         opt.update(kwds.pop('opt', {}))
-        kwds.setdefault('preview', __incpy__.vim.gvars['incpy#WindowPreview'])
-        kwds.setdefault('tab', __incpy__.internal.tab.getCurrent())
-        self.view = __incpy__.view(kwds.pop('buffer', None) or __incpy__.vim.gvars['incpy#WindowName'], opt, **kwds)
+        kwds.setdefault('preview', vim.gvars['incpy#WindowPreview'])
+        kwds.setdefault('tab', internal.tab.getCurrent())
+        self.view = interface.view(kwds.pop('buffer', None) or vim.gvars['incpy#WindowName'], opt, **kwds)
 
     def write(self, data):
         """Writes data directly into view"""
@@ -36,30 +38,28 @@ class interpreter(object):
 
     def attach(self):
         """Attaches interpreter to view"""
-        raise __incpy__.builtins.NotImplementedError
+        raise NotImplementedError
 
     def detach(self):
         """Detaches interpreter from view"""
-        raise __incpy__.builtins.NotImplementedError
+        raise NotImplementedError
 
     def communicate(self, command, silent=False):
         """Sends commands to interpreter"""
-        raise __incpy__.builtins.NotImplementedError
+        raise NotImplementedError
 
     def start(self):
         """Starts the interpreter"""
-        raise __incpy__.builtins.NotImplementedError
+        raise NotImplementedError
 
     def stop(self):
         """Stops the interpreter"""
-        raise __incpy__.builtins.NotImplementedError
-__incpy__.interpreter = interpreter; del(interpreter)
+        raise NotImplementedError
 
-class interpreter_python_internal(__incpy__.interpreter):
+class interpreter_python_internal(interpreter):
     state = None
 
     def attach(self):
-        sys, logging, logger = __incpy__.sys, __import__('logging'), __incpy__.logger
         self.state = sys.stdin, sys.stdout, sys.stderr, logger
 
         # notify the user
@@ -78,13 +78,12 @@ class interpreter_python_internal(__incpy__.interpreter):
             logger.fatal("refusing to detach internal interpreter as it was already previously detached")
             return
 
-        sys, logging = __incpy__ and __incpy__.sys or __import__('sys'), __import__('logging')
         _, _, err, logger = self.state
 
         # remove the python output window formatter from the root logger
         logger.debug("removing window handler from root logger")
         try:
-            logger.root.removeHandler(__incpy__.six.next(L for L in logger.root.handlers if isinstance(L, logging.StreamHandler) and type(L.stream).__name__ == 'view'))
+            logger.root.removeHandler(next(L for L in logger.root.handlers if isinstance(L, logging.StreamHandler) and type(L.stream).__name__ == 'view'))
         except StopIteration:
             pass
 
@@ -95,28 +94,27 @@ class interpreter_python_internal(__incpy__.interpreter):
         (sys.stdin, sys.stdout, sys.stderr, _), self.state = self.state, None
 
     def communicate(self, data, silent=False):
-        echonewline = __incpy__.vim.gvars['incpy#EchoNewline']
-        if __incpy__.vim.gvars['incpy#Echo'] and not silent:
-            echoformat = __incpy__.vim.gvars['incpy#EchoFormat']
+        echonewline = vim.gvars['incpy#EchoNewline']
+        if vim.gvars['incpy#Echo'] and not silent:
+            echoformat = vim.gvars['incpy#EchoFormat']
             lines = data.split('\n')
             iterable = (index for index, item in enumerate(lines[::-1]) if item.strip())
             trimmed = next(iterable, 0)
             echo = '\n'.join(map(echoformat.format, lines[:-trimmed] if trimmed > 0 else lines))
             self.write(echonewline.format(echo))
-        __incpy__.six.exec_(data, __incpy__.builtins.globals())
+        exec(data, globals())   # FIXME: need the namespace to write things to
 
     def start(self):
-        __incpy__.logger.warning("internal interpreter has already been (implicitly) started")
+        logger.warning("internal interpreter has already been (implicitly) started")
 
     def stop(self):
-        __incpy__.logger.fatal("unable to stop internal interpreter as it is always running")
-__incpy__.interpreter_python_internal = interpreter_python_internal; del(interpreter_python_internal)
+        logger.fatal("unable to stop internal interpreter as it is always running")
 
 # external interpreter (newline delimited)
-class interpreter_external(__incpy__.interpreter):
+class interpreter_external(interpreter):
     instance = None
 
-    @__incpy__.builtins.classmethod
+    @classmethod
     def new(cls, command, **options):
         res = cls(**options)
         [ options.pop(item, None) for item in cls.view_options ]
@@ -124,10 +122,8 @@ class interpreter_external(__incpy__.interpreter):
         return res
 
     def attach(self):
-        logger, = __incpy__.logger,
-
         logger.debug("connecting i/o from {!r} to {!r}".format(self.command, self.view))
-        self.instance = __incpy__.spawn(self.view.write, self.command, **self.options)
+        self.instance = spawn(self.view.write, self.command, **self.options)
         logger.info("started process {:d} ({:#x}): {:s}".format(self.instance.id, self.instance.id, self.command))
 
         self.state = logger,
@@ -148,9 +144,9 @@ class interpreter_external(__incpy__.interpreter):
         self.instance = None
 
     def communicate(self, data, silent=False):
-        echonewline = __incpy__.vim.gvars['incpy#EchoNewline']
-        if __incpy__.vim.gvars['incpy#Echo'] and not silent:
-            echoformat = __incpy__.vim.gvars['incpy#EchoFormat']
+        echonewline = vim.gvars['incpy#EchoNewline']
+        if vim.gvars['incpy#Echo'] and not silent:
+            echoformat = vim.gvars['incpy#EchoFormat']
             lines = data.split('\n')
             iterable = (index for index, item in enumerate(lines[::-1]) if item.strip())
             trimmed = next(iterable, 0)
@@ -159,22 +155,21 @@ class interpreter_external(__incpy__.interpreter):
         self.instance.write(data)
 
     def __repr__(self):
-        res = __incpy__.builtins.super(__incpy__.interpreter_external, self).__repr__()
+        res = super(interpreter_external, self).__repr__()
         if self.instance.running:
             return "{:s} {{{!r} {:s}}}".format(res, self.instance, self.command)
         return "{:s} {{{!s}}}".format(res, self.instance)
 
     def start(self):
-        __incpy__.logger.info("starting process {!r}".format(self.instance))
+        logger.info("starting process {!r}".format(self.instance))
         self.instance.start()
 
     def stop(self):
-        __incpy__.logger.info("stopping process {!r}".format(self.instance))
+        logger.info("stopping process {!r}".format(self.instance))
         self.instance.stop()
-__incpy__.interpreter_external = interpreter_external; del(interpreter_external)
 
 # terminal interpreter
-class interpreter_terminal(__incpy__.interpreter_external):
+class interpreter_terminal(interpreter_external):
     instance = None
 
     # hacked this in because i'm not sure what interpreter_external is supposed to be doing
@@ -187,13 +182,13 @@ class interpreter_terminal(__incpy__.interpreter_external):
 
     def __init__(self, **kwds):
         self.__options = {'hidden': True}
-        opt = {}.__class__(__incpy__.vim.gvars['incpy#CoreWindowOptions'])
-        opt.update(__incpy__.vim.gvars['incpy#WindowOptions'])
+        opt = {}.__class__(vim.gvars['incpy#CoreWindowOptions'])
+        opt.update(vim.gvars['incpy#WindowOptions'])
         opt.update(kwds.pop('opt', {}))
         self.__options.update(opt)
 
-        kwds.setdefault('preview', __incpy__.vim.gvars['incpy#WindowPreview'])
-        kwds.setdefault('tab', __incpy__.internal.tab.getCurrent())
+        kwds.setdefault('preview', vim.gvars['incpy#WindowPreview'])
+        kwds.setdefault('tab', internal.tab.getCurrent())
         self.__keywords = kwds
         #self.__view = None
         self.buffer = None
@@ -202,26 +197,26 @@ class interpreter_terminal(__incpy__.interpreter_external):
     def view(self):
         #if self.__view:
         #    return self.__view
-        current = __incpy__.internal.window.current()
-        #__incpy__.internal.window.select(__incpy__.vim.gvars['incpy#WindowName'])
-        #__incpy__.vim.command('terminal ++open ++noclose ++curwin')
+        current = internal.window.current()
+        #internal.window.select(vim.gvars['incpy#WindowName'])
+        #vim.command('terminal ++open ++noclose ++curwin')
         buffer = self.start() if self.buffer is None else self.buffer
-        self.__view = res = __incpy__.view(buffer, self.options, **self.__keywords)
-        __incpy__.internal.window.select(current)
+        self.__view = res = interface.view(buffer, self.options, **self.__keywords)
+        internal.window.select(current)
         return res
 
     def attach(self):
         """Attaches interpreter to view"""
         view = self.view
         window = view.window
-        current = __incpy__.internal.window.current()
+        current = internal.window.current()
 
         # search to see if window exists, if it doesn't..then show it.
-        searched = __incpy__.internal.window.buffer(self.buffer)
+        searched = internal.window.buffer(self.buffer)
         if searched < 0:
             self.view.buffer = self.buffer
 
-        __incpy__.internal.window.select(current)
+        internal.window.select(current)
         # do nothing, always attached
 
     def detach(self):
@@ -230,9 +225,9 @@ class interpreter_terminal(__incpy__.interpreter_external):
 
     def communicate(self, data, silent=False):
         """Sends commands to interpreter"""
-        echonewline = __incpy__.vim.gvars['incpy#EchoNewline']
-        if __incpy__.vim.gvars['incpy#Echo'] and not silent:
-            echoformat = __incpy__.vim.gvars['incpy#EchoFormat']
+        echonewline = vim.gvars['incpy#EchoNewline']
+        if vim.gvars['incpy#Echo'] and not silent:
+            echoformat = vim.gvars['incpy#EchoFormat']
             lines = data.split('\n')
             iterable = (index for index, item in enumerate(lines[::-1]) if item.strip())
             trimmed = next(iterable, 0)
@@ -241,13 +236,13 @@ class interpreter_terminal(__incpy__.interpreter_external):
             #echo = '\n'.join(map(echoformat.format, lines[:-trimmed] if trimmed > 0 else lines))
             #self.write(echonewline.format(echo))
 
-        term_sendkeys = __incpy__.vim.Function('term_sendkeys')
+        term_sendkeys = vim.Function('term_sendkeys')
         buffer = self.view.buffer
         term_sendkeys(buffer.number, data)
 
     def start(self):
         """Starts the interpreter"""
-        term_start = __incpy__.vim.Function('term_start')
+        term_start = vim.Function('term_start')
 
         # because python is maintained by fucking idiots
         ignored_env = {'PAGER', 'MANPAGER'}
@@ -257,7 +252,7 @@ class interpreter_terminal(__incpy__.interpreter_external):
         options = vim.Dictionary({
             "hidden": 1,
             "stoponexit": 'term',
-            "term_name": __incpy__.vim.gvars['incpy#WindowName'],
+            "term_name": vim.gvars['incpy#WindowName'],
             "term_kill": 'hup',
             "term_finish": "open",
             # "env": vim.Dictionary(filtered_env),  # because VIM doesn't do as it's told
@@ -267,17 +262,16 @@ class interpreter_terminal(__incpy__.interpreter_external):
 
     def stop(self):
         """Stops the interpreter"""
-        term_getjob = __incpy__.vim.Function('term_getjob')
+        term_getjob = vim.Function('term_getjob')
         job = term_getjob(self.buffer)
 
-        job_stop = __incpy__.vim.Function('job_stop')
+        job_stop = vim.Function('job_stop')
         job_stop(job)
 
-        job_status = __incpy__.vim.Function('job_status')
+        job_status = vim.Function('job_status')
         if job_status(job) != 'dead':
-            raise builtins.Exception("Unable to terminate job {:d}".format(job))
+            raise Exception("Unable to terminate job {:d}".format(job))
         return
-__incpy__.interpreter_terminal = interpreter_terminal; del(interpreter_terminal)
 
 # spawn interpreter requested by user
 _ = __incpy__.vim.gvars["incpy#Program"]
