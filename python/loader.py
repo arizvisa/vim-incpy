@@ -138,7 +138,8 @@ class vim_plugin_support_loader_py2(vim_plugin_support_loader):
         #assert(name == fullname), (name, fullname)
 
         #module = python_import_machinery.load_source(fullname, path)
-        with builtins.open(path, 'rt') as infile:
+        with builtins.open(path, 'rt') as stream:
+            infile = os.fdopen(os.dup(stream.fileno()))
             #module = python_import_machinery.load_module(name, infile, path, self.get_spec())
             module = python_import_machinery.load_module(fullname, infile, path, self.get_spec())
 
