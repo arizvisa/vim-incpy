@@ -1,21 +1,10 @@
-import six, sys, logging, functools, codecs
+import sys, logging, functools, codecs
 logger = logging.getLogger('incpy').getChild('py')
 
-integer_types = tuple({type(sys.maxsize + n) for n in range(2)})
-string_types = tuple({type(s) for s in ['', u'']})
-text_types = tuple({t.__base__ for t in string_types}) if sys.version_info.major < 3 else string_types
-ordinal_types = (string_types, bytes)
+from . import integer_types, string_types
 
 try:
     import vim as _vim
-
-    # Try python2's exceptions module first
-    try:
-        import exceptions
-
-    # Otherwise we're using Python3 and it's a builtin
-    except ImportError:
-        import builtins as exceptions
 
     # vim wrapper
     class vim(object):
@@ -136,8 +125,8 @@ try:
             return n
 
         # error class
-        _error = getattr(_vim, 'error', exceptions.Exception)
-        class error(_error if issubclass(_error, exceptions.Exception) else exceptions.Exception):
+        _error = getattr(_vim, 'error', Exception)
+        class error(_error if issubclass(_error, Exception) else Exception):
             """An exception originating from vim's python implementation."""
 
         # buffer/window
@@ -367,11 +356,11 @@ class internal(object):
         def optionsToCommandLine(options):
             result = []
             for k, v in options.items():
-                if isinstance(v, six.string_types):
+                if isinstance(v, string_types):
                     result.append("{:s}={:s}".format(k, v))
                 elif isinstance(v, bool):
                     result.append("{:s}{:s}".format('' if v else 'no', k))
-                elif isinstance(v, six.integer_types):
+                elif isinstance(v, integer_types):
                     result.append("{:s}={:d}".format(k, v))
                 else:
                     raise NotImplementedError(k, v)
@@ -525,9 +514,9 @@ class view(object):
 
             # Create a buffer with the specified name. This is not really needed
             # as we're only creating it to sneak off with the buffer's name.
-            if isinstance(buffer, six.string_types):
+            if isinstance(buffer, string_types):
                 buf = internal.buffer.new(buffer)
-            elif isinstance(buffer, six.integer_types):
+            elif isinstance(buffer, integer_types):
                 buf = internal.buffer.new(vim.gvars['incpy#WindowName'])
             else:
                 raise vim.error("Unable to determine output buffer name from parameter : {!r}".format(buffer))
@@ -552,9 +541,9 @@ class view(object):
             logger.info("recreating output buffer due to exception : {!s}".format(E), exc_info=True)
 
             # Create a new buffer using the name that we expect it to have.
-            if isinstance(name, six.string_types):
+            if isinstance(name, string_types):
                 result = internal.buffer.new(name)
-            elif isinstance(name, six.integer_types):
+            elif isinstance(name, integer_types):
                 result = internal.buffer.new(vim.gvars['incpy#WindowName'])
             else:
                 raise vim.error("Unable to determine output buffer name from parameter : {!r}".format(name))
@@ -626,7 +615,7 @@ class view(object):
 
     def __repr__(self):
         name = self.buffer.name
-        descr = "{:d}".format(name) if isinstance(name, six.integer_types) else "\"{:s}\"".format(name)
+        descr = "{:d}".format(name) if isinstance(name, integer_types) else "\"{:s}\"".format(name)
         identity = descr if buffer.exists(self.__buffer_name) else "(missing) {:s}".format(descr)
         if self.preview:
             return "<view buffer:{:d} {:s} preview>".format(self.window, identity)
