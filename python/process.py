@@ -1,7 +1,8 @@
-import six, sys, logging, functools, codecs
+import sys, functools, itertools, operator
+import os, logging, codecs, weakref, time, itertools, shlex
 logger = logging.getLogger('incpy').getChild('py')
 
-from . import integer_types, string_types
+from . import integer_types, string_types, reraise
 
 try:
     # make sure the user has selected the gevent-based version by importing gevent
@@ -73,7 +74,6 @@ except ImportError:
         Queue, QueueEmptyException = map(staticmethod, (Queue.Queue, Queue.Empty))
 
 ### asynchronous process monitor
-import sys, os, weakref, time, itertools, shlex
 
 # monitoring an external process' i/o via threads/queues
 class process(object):
@@ -438,7 +438,7 @@ class process(object):
             while self.running and self.eventWorking.is_set() and time.time() - t < timeout:
                 if not self.exceptionQueue.empty():
                     res = self.exception()
-                    six.reraise(res[0], res[1], res[2])
+                    reraise(res[0], res[1], res[2])
                 continue
             return self.program.returncode if self.eventWorking.is_set() else self.__terminate()
 
@@ -449,7 +449,7 @@ class process(object):
         while self.running and self.eventWorking.is_set():
             if not self.exceptionQueue.empty():
                 res = self.exception()
-                six.reraise(res[0], res[1], res[2])
+                reraise(res[0], res[1], res[2])
             continue    # ugh...poll-forever (and kill-cpu) until program terminates...
 
         if not self.eventWorking.is_set():
@@ -475,7 +475,7 @@ class process(object):
             return self.program.returncode
 
         res = self.exception()
-        six.reraise(res[0], res[1], res[2])
+        reraise(res[0], res[1], res[2])
 
     def __stop_monitoring(self):
         '''Cleanup monitoring threads.'''
