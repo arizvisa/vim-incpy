@@ -1,12 +1,13 @@
-import sys, builtins, six, logging
-from . import incpy, interface, process
+import sys, logging
+logger = logging.getLogger('incpy').getChild('vim')
+
+from . import interface, process
 
 internal = interface.internal
 vim = interface.vim
 
 # save initial state
 state = tuple(getattr(sys, _) for _ in ['stdin', 'stdout', 'stderr'])
-logger = logging.getLogger('incpy').getChild('vim')
 
 # interpreter classes
 class interpreter(object):
@@ -293,6 +294,3 @@ del(opt)
 view = cache.view
 interface.vim.gvars['incpy#BufferId'] = view.buffer.number
 view.create(interface.vim.gvars['incpy#WindowPosition'], interface.vim.gvars['incpy#WindowRatio'])
-
-# delete our temp variable
-del(view)

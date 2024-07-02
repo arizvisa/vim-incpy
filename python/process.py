@@ -1,10 +1,7 @@
 import six, sys, logging, functools, codecs
 logger = logging.getLogger('incpy').getChild('py')
 
-integer_types = tuple({type(sys.maxsize + n) for n in range(2)})
-string_types = tuple({type(s) for s in ['', u'']})
-text_types = tuple({t.__base__ for t in string_types}) if sys.version_info.major < 3 else string_types
-ordinal_types = (string_types, bytes)
+from . import integer_types, string_types
 
 try:
     # make sure the user has selected the gevent-based version by importing gevent
