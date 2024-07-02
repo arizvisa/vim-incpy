@@ -502,6 +502,280 @@ function! incpy#SetupOptions()
     endfor
 endfunction
 
+function! incpy#SetupPackageLoader(currentscriptpath)
+pythonx << EOF
+def generate_package_loaders(module, path):
+    import sys, os, itertools
+
+    # Now for the obligatory version checks that assign each
+    # available class method to the correct implementation.
+    class python_import_machinery(object):
+        """
+        This class is a wrapper around the import machinery used by the Python
+        interpreter. It does this by implementing a few of the functions from
+        the original Py2 "imp" module using the "importlib" functionality that
+        was introduced with Python 3.4. On earlier versions of Python, the
+        implementation just wraps the relevant functions of the "imp" module.
+        """
+
+        # Py2-specific functions for dynamically generating and loading
+        # modules. All are based on the original "imp" module functionality.
+        @classmethod
+        def new_module_py2(cls, fullname):
+            return cls.imp.new_module(fullname)
+
+        @classmethod
+        def find_module_py2(cls, name, path=None):
+            return cls.imp.find_module(name, path)
+
+        @classmethod
+        def load_module_py2(cls, name, file, path, description):
+            return cls.imp.load_module(name, file, path, description)
+
+        @classmethod
+        def load_source_py2(cls, name, path):
+            return cls.imp.load_source(name, path)
+
+        @classmethod
+        def module_spec_py2(cls, *args, **kwargs):
+            raise NotImplementedError
+
+        @classmethod
+        def module_spec_from_file_py2(cls, name, path):
+            raise NotImplementedError
+
+        # Py3-specific functions for dynamically generating and loading
+        # modules. These use the new module loader specification format
+        # found within the "importlib" module. It (poorly) attempts to
+        # load modules exactly how Py2 used to originally load modules.
+        @classmethod
+        def new_module_py3(cls, fullname):
+            spec = cls.importlib.machinery.ModuleSpec(fullname, None)
+            module = cls.importlib.util.module_from_spec(spec)
+            return module
+
+        @classmethod
+        def find_module_py3(cls, name, path=None):
+            ext, fucking_paths = 'py', sys.path if path is None else path
+            for path in fucking_paths:
+                fullpath = os.path.join(path, '.'.join([name, ext]))
+                spec = cls.importlib.util.spec_from_file_location(name, fullpath)
+                if spec:
+                    filemode, PY_SOURCE, PY_COMPILED, C_EXTENSION = 'rt', 1, 2, 3
+                    description = ext, filemode, PY_SOURCE
+                    return open(fullpath, filemode), fullpath, description
+                continue
+            raise ModuleNotFoundError
+
+        @classmethod
+        def load_module_py3(cls, name, path):
+            spec = cls.importlib.util.spec_from_file_location(name, path)
+            module = cls.importlib.util.module_from_spec(spec)
+            sys.modules[name] = module
+            spec.loader.exec_module(module)
+            return module
+
+        @classmethod
+        def load_source_py3(cls, name, path):
+            loader = cls.importlib.machinery.SourceFileLoader(name, path)
+            spec = cls.importlib.util.spec_from_loader(loader.name, loader)
+            module = cls.importlib.util.module_from_spec(spec)
+            loader.exec_module(module)
+            return module
+
+        @classmethod
+        def module_spec_py3(cls, *args, **kwargs):
+            return cls.importlib.machinery.ModuleSpec(*args, **kwargs)
+
+        @classmethod
+        def module_spec_from_file_py3(cls, name, path):
+            return cls.importlib.util.spec_from_file_location(name, path)
+
+        # These assignments are for compatibility with Py2.
+        if sys.version_info.major < 3 or (sys.version_info.major == 3 and sys.version_info.minor < 4):
+            import imp
+            new_module, find_module, load_module, load_source = new_module_py2, find_module_py2, load_module_py2, load_source_py2
+            module_spec, module_spec_from_file = module_spec_py2, module_spec_from_file_py2
+
+        # These next ones map the same functions to their Py3 versions.
+        else:
+            import importlib, importlib.machinery, importlib.util
+            new_module, find_module, load_module, load_source = new_module_py3, find_module_py3, load_module_py3, load_source_py3
+            module_spec, module_spec_from_file = module_spec_py3, module_spec_from_file_py3
+
+    class vim_plugin_support_loader(object):
+        def __init__(self, name, components, path):
+            self._name, self._components, self._path = name, components, path
+        def get_spec(self):
+            PY_SOURCE = 1
+            _, ext = os.path.splitext(self._path)
+            return ext, 'r', PY_SOURCE
+        def create_module(self, spec):
+            return None
+        def exec_module(self, module):
+            with open(self._path, 'rt') as infile:
+                exec(infile.read(), module.__dict__, module.__dict__)
+            return module
+
+    class vim_plugin_support_loader_py2(vim_plugin_support_loader):
+        def __init__(self, name, components, path):
+            self._name, self._components, self._path = name, components, path
+        def load_module(self, fullname):
+            name, path = '.'.join(itertools.chain([self._name], self._components)), self._path
+            #assert(name == fullname), (name, fullname)
+
+            #module = python_import_machinery.load_source(fullname, path)
+            with open(path, 'rt') as infile:
+                #module = python_import_machinery.load_module(name, infile, path, self.get_spec())
+                module = python_import_machinery.load_module(fullname, infile, path, self.get_spec())
+
+            dp = os.path.dirname(path)
+            if os.path.isdir(dp):
+                module.__path__ = [dp]
+            return module
+
+    class vim_plugin_support_finder(object):
+        def __init__(self, path, mapping):
+            self._runtime_path = path
+            self._mapping = mapping
+
+        # Py2
+        def find_module(self, fullname, path=None):
+            module, submodule = fullname.split('.', 1) if '.' in fullname else (fullname, '')
+            if fullname in self._mapping:
+                filename = self._mapping[fullname]
+                fp = os.path.join(self._runtime_path, filename)
+                if os.path.exists(fp):
+                    return vim_plugin_support_loader_py2(module, [], fp)
+                return None
+
+            elif module in self._mapping:
+                package_path, suffix = os.path.splitext(os.path.join(self._runtime_path, self._mapping[module]))
+                components = submodule.split('.')
+                fp = os.path.join(*itertools.chain([package_path], components[:-1], [''.join(itertools.chain(components[-1:], [suffix]))]))
+                dp = os.path.dirname(fp)
+                if os.path.exists(fp):
+                    return vim_plugin_support_loader_py2(module, components, fp)
+                return None
+
+            return None
+
+        # Py3
+        def find_spec(self, fullname, path, target=None):
+            module, submodule = fullname.split('.', 1) if '.' in fullname else (fullname, '')
+            if fullname in self._mapping:
+                filename = self._mapping[fullname]
+                fp = os.path.join(self._runtime_path, filename)
+                if not os.path.exists(fp):
+                    return None
+
+                package, suffix = os.path.splitext(fp)
+                attributes = {'is_package': True} if os.path.isdir(package) else {}
+                loader = vim_plugin_support_loader(fullname, [], fp)
+                return python_import_machinery.module_spec(fullname, loader, **attributes)
+
+            elif module in self._mapping:
+                package_path, suffix = os.path.splitext(os.path.join(self._runtime_path, self._mapping[module]))
+                components = submodule.split('.')
+                fp = os.path.join(*itertools.chain([package_path], components[:-1], [''.join(itertools.chain(components[-1:], [suffix]))]))
+                if not os.path.exists(fp):
+                    return None
+
+                dp = os.path.dirname(fp)
+                attributes = {'is_package': True} if os.path.isdir(dp) else {}
+                loader = vim_plugin_support_loader(module, components, fp)
+                return python_import_machinery.module_spec(fullname, loader, **attributes)
+
+            return None
+
+    class vim_plugin_packager(object):
+        def __init__(self, name, finders, namespace=None):
+            self._name = name
+            self._finders = [finder for finder in finders]
+            self._namespace = namespace or {}
+
+        class package_loader_py2(object):
+            def __init__(self, discard, original):
+                self._discard, self._original = discard, original
+            def __getattr__(self, attribute):
+                return getattr(self._original, attribute)
+            def load_module(self, fullname):
+                length, components = len(self._discard), fullname.split('.')
+                if components[:length] != self._discard:
+                    raise ImportError
+                #return self._original.load_module('.'.join(components[length:]))
+                return self._original.load_module(fullname)
+
+        def choose_finder(self, components, path):
+            fullname = '.'.join(components)
+            for finder in self._finders:
+                loader = finder.find_module(fullname, path)
+                if loader:
+                    return self.package_loader_py2([self._name], loader)
+                continue
+            return None
+
+        def find_module(self, fullname, path=None):
+            module, submodule = fullname.split('.', 1) if '.' in fullname else (fullname, '')
+            if fullname in {self._name}:
+                return self
+            elif module in {self._name}:
+                components = submodule.split('.')
+                return self.choose_finder(components, path)
+            return None
+
+        def load_module(self, fullname):
+            module = sys.modules[fullname] = python_import_machinery.new_module(fullname)
+            module.__dict__.update(self._namespace)
+            module.__dict__.setdefault('__path__', [])
+            return module
+
+        def wrap_spec(self, spec):
+            name, loader, origin, loader_state = (getattr(spec, attribute) for attribute in ['name', 'loader', 'origin', 'loader_state'])
+            is_package = spec.submodule_search_locations is not None
+
+            fullname = '.'.join([self._name, name])
+
+            res = python_import_machinery.module_spec(fullname, loader, origin=origin, loader_state=loader_state, is_package=is_package)
+            res.submodule_search_locations = spec.submodule_search_locations
+            res.has_location = spec.has_location
+            res.cached = spec.cached
+            return res
+
+        def choose_spec(self, components, path, target):
+            fullname = '.'.join(components)
+            for finder in self._finders:
+                spec = finder.find_spec(fullname, path, target)
+                if spec:
+                    return self.wrap_spec(spec)
+                continue
+            return None
+
+        def find_spec(self, fullname, path, target=None):
+            module, submodule = fullname.split('.', 1) if '.' in fullname else (fullname, '')
+            if fullname in {self._name}:
+                return python_import_machinery.module_spec(fullname, self, is_package=True)
+            elif module in {self._name}:
+                components = submodule.split('.')
+                return self.choose_spec(components, path, target)
+            return None
+
+        def create_module(self, spec):
+            return None
+
+        def exec_module(self, module):
+            module.__dict__.update(self._namespace)
+            return module
+
+    currentscriptpath = path
+    files = [filename for filename in os.listdir(currentscriptpath) if filename.endswith('.py')]
+    iterable = ((os.path.splitext(filename), os.path.join(currentscriptpath, filename)) for filename in files)
+    submodules = {name : path for (name, ext), path in iterable}
+    pythonx_finder = vim_plugin_support_finder(currentscriptpath, submodules)
+    yield vim_plugin_packager(module, [pythonx_finder])
+EOF
+endfunction
+
 function! incpy#SetupPython(currentscriptpath)
     " Set up the module search path to include the script's "python" directory
     let m = substitute(a:currentscriptpath, "\\", "/", "g")
