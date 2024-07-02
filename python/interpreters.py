@@ -31,9 +31,10 @@ class interpreter(object):
         return self.view.write(data)
 
     def __repr__(self):
+        cls = self.__class__
         if self.view.window > -1:
-            return "<{:s} buffer:{:d}>".format(self.__class__.__name__, self.view.buffer.number)
-        return "<{:s} buffer:{:d} hidden>".format(self.__class__.__name__, self.view.buffer.number)
+            return "<{:s} buffer:{:d}>".format('.'.join([__name__, cls.__name__]), self.view.buffer.number)
+        return "<{:s} buffer:{:d} hidden>".format('.'.join([__name__, cls.__name__]), self.view.buffer.number)
 
     def attach(self):
         """Attaches interpreter to view"""

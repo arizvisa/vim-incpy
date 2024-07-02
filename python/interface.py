@@ -469,7 +469,8 @@ class buffer(object):
     number = property(fget=lambda self: self.buffer.number)
 
     def __repr__(self):
-        return "<incpy.buffer {:d} \"{:s}\">".format(self.number, self.name)
+        cls = self.__class__
+        return "<{:s} {:d} \"{:s}\">".format('.'.join([__name__, cls.__name__]), self.number, self.name)
 
     # Editing buffer the buffer in-place
     def write(self, data):
@@ -611,9 +612,9 @@ class view(object):
         return vim.window.hide(bufobj.number, preview=self.preview)
 
     def __repr__(self):
-        name = self.buffer.name
+        cls, name = self.__class__, self.buffer.name
         descr = "{:d}".format(name) if isinstance(name, integer_types) else "\"{:s}\"".format(name)
         identity = descr if buffer.exists(self.__buffer_name) else "(missing) {:s}".format(descr)
         if self.preview:
-            return "<view buffer:{:d} {:s} preview>".format(self.window, identity)
-        return "<view buffer:{:d} {:s}>".format(self.window, identity)
+            return "<{:s} buffer:{:d} {:s} preview>".format('.'.join([__name__, cls.__name__]), self.window, identity)
+        return "<{:s} buffer:{:d} {:s}>".format('.'.join([__name__, cls.__name__]), self.window, identity)
