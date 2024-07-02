@@ -56,7 +56,7 @@ class interpreter(object):
         """Stops the interpreter"""
         raise NotImplementedError
 
-class interpreter_python_internal(interpreter):
+class python_internal(interpreter):
     state = None
 
     def attach(self):
@@ -111,7 +111,7 @@ class interpreter_python_internal(interpreter):
         logger.fatal("unable to stop internal interpreter as it is always running")
 
 # external interpreter (newline delimited)
-class interpreter_external(interpreter):
+class external(interpreter):
     instance = None
 
     @classmethod
@@ -155,7 +155,7 @@ class interpreter_external(interpreter):
         self.instance.write(data)
 
     def __repr__(self):
-        res = super(interpreter_external, self).__repr__()
+        res = super(external, self).__repr__()
         if self.instance.running:
             return "{:s} {{{!r} {:s}}}".format(res, self.instance, self.command)
         return "{:s} {{{!s}}}".format(res, self.instance)
@@ -169,10 +169,10 @@ class interpreter_external(interpreter):
         self.instance.stop()
 
 # terminal interpreter
-class interpreter_terminal(interpreter_external):
+class terminal(external):
     instance = None
 
-    # hacked this in because i'm not sure what interpreter_external is supposed to be doing
+    # hacked this in because i'm not sure what external is supposed to be doing
     @property
     def options(self):
         return self.__options
@@ -278,16 +278,16 @@ _ = interface.vim.gvars["incpy#Program"]
 opt = {'winfixwidth':True, 'winfixheight':True} if interface.vim.gvars["incpy#WindowFixed"] > 0 else {}
 try:
     if interface.vim.eval('has("terminal")') and len(_) > 0:
-        cache = interpreter_terminal.new(_, opt=opt)
+        cache = terminal.new(_, opt=opt)
     elif len(_) > 0:
-        cache = interpreter_external.new(_, opt=opt)
+        cache = external.new(_, opt=opt)
     else:
-        cache = interpreter_python_internal.new(opt=opt)
+        cache = python_internal.new(opt=opt)
 
 except Exception:
     logger.fatal("error starting external interpreter: {:s}".format(_), exc_info=True)
     logger.warning("falling back to internal python interpreter")
-    cache = interpreter_python_internal.new(opt=opt)
+    cache = python_internal.new(opt=opt)
 del(opt)
 
 # create it's window, and store the buffer's id
