@@ -1,6 +1,11 @@
 import six, sys, logging, functools, codecs
 logger = logging.getLogger('incpy').getChild('py')
 
+integer_types = tuple({type(sys.maxsize + n) for n in range(2)})
+string_types = tuple({type(s) for s in ['', u'']})
+text_types = tuple({t.__base__ for t in string_types}) if sys.version_info.major < 3 else string_types
+ordinal_types = (string_types, bytes)
+
 try:
     import vim as _vim
 
@@ -100,21 +105,21 @@ try:
         # converters
         @classmethod
         def _to(cls, n):
-            if isinstance(n, six.integer_types):
+            if isinstance(n, integer_types):
                 return str(n)
             if isinstance(n, float):
                 return "{:f}".format(n)
-            if isinstance(n, six.string_types):
+            if isinstance(n, string_types):
                 return "{!r}".format(n)
             if isinstance(n, list):
                 return "[{:s}]".format(','.join(map(cls._to, n)))
             if isinstance(n, dict):
-                return "{{{:s}}}".format(','.join((':'.join((cls._to(k), cls._to(v))) for k, v in six.iteritems(n))))
+                return "{{{:s}}}".format(','.join((':'.join((cls._to(k), cls._to(v))) for k, v in n.items())))
             raise Exception("Unknown type {:s} : {!r}".format(type(n),n))
 
         @classmethod
         def _from(cls, n):
-            if isinstance(n, six.string_types):
+            if isinstance(n, string_types):
                 if n.startswith('['):
                     return cls._from(eval(n))
                 if n.startswith('{'):
@@ -127,7 +132,7 @@ try:
             if isinstance(n, list):
                 return [ cls._from(item) for item in n ]
             if isinstance(n, dict):
-                return { str(k) : cls._from(v) for k, v in six.iteritems(n) }
+                return { str(k) : cls._from(v) for k, v in n.items() }
             return n
 
         # error class
@@ -223,10 +228,10 @@ try:
                 return buffer.number == identity
 
             # Figure out which closure we need to use based on the parameter type
-            if isinstance(identity, six.string_types):
+            if isinstance(identity, string_types):
                 res, match = "'{:s}'".format(identity.replace("'", "''")), match_name
 
-            elif isinstance(identity, six.integer_types):
+            elif isinstance(identity, integer_types):
                 res, match = "{:d}".format(identity), match_id
 
             else:
@@ -251,10 +256,10 @@ try:
                 return buffer.number == identity
 
             # Figure out which matcher type we need to use based on the type
-            if isinstance(identity, six.string_types):
+            if isinstance(identity, string_types):
                 res, match = "'{:s}'".format(identity.replace("'", "''")), match_name
 
-            elif isinstance(identity, six.integer_types):
+            elif isinstance(identity, integer_types):
                 res, match = "{:d}".format(identity), match_id
 
             else:
@@ -287,7 +292,7 @@ try:
         # Editing buffer the buffer in-place
         def write(self, data):
             result = iter(data.split('\n'))
-            self.buffer[-1] += six.next(result)
+            self.buffer[-1] += next(result)
             [ self.buffer.append(item) for item in result ]
 
         def clear(self):
@@ -416,7 +421,7 @@ class process(object):
         self.__threads__ = weakref.WeakSet()
         self.__kwds = kwds
 
-        args = shlex.split(command) if isinstance(command, six.string_types) else command[:]
+        args = shlex.split(command) if isinstance(command, string_types) else command[:]
         command = args.pop(0)
         self.command = command, args[:]
 
@@ -570,7 +575,7 @@ class process(object):
         options['shell'] = shell
 
         ## split our arguments out if necessary
-        command = shlex.split(program) if isinstance(program, six.string_types) else program[:]
+        command = shlex.split(program) if isinstance(program, string_types) else program[:]
 
         ## finally hand it off to subprocess.Popen
         try: return Asynchronous.spawn(command, **options)
@@ -593,7 +598,7 @@ class process(object):
 
         for id, pipe in itertools.chain([target], more):
             res, name = stuff(q, id), "{:s}<{!r}>".format(options.get('name', ''), id)
-            yield process.monitor(six.next(res) or res.send, pipe, name=name), res
+            yield process.monitor(next(res) or res.send, pipe, name=name), res
         return
 
     @staticmethod
@@ -613,7 +618,7 @@ class process(object):
 
         for id, reader in  itertools.chain([target], more):
             res, name = stuff(q, id), "{:s}<{!r}>".format(options.get('name', ''), id)
-            yield process.monitor_reader(six.next(res) or res.send, reader, name=name), res
+            yield process.monitor_reader(next(res) or res.send, reader, name=name), res
         return
 
     @staticmethod
@@ -834,10 +839,10 @@ def spawn(stdout, command, **options):
 
     # empty out the first generator result if a coroutine is passed
     if hasattr(stdout, 'send'):
-        res = six.next(stdout)
+        res = next(stdout)
         res and P.write(res)
     if hasattr(stderr, 'send'):
-        res = six.next(stderr)
+        res = next(stderr)
         res and P.write(res)
 
     # spawn the sub-process

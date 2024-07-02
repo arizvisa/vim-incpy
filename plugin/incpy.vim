@@ -925,7 +925,7 @@ class internal(object):
         def optionsToCommandLine(options):
             builtins = __incpy__.builtins
             result = []
-            for k, v in __incpy__.six.iteritems(options):
+            for k, v in options.items():
                 if builtins.isinstance(v, __incpy__.six.string_types):
                     result.append("{:s}={:s}".format(k, v))
                 elif builtins.isinstance(v, builtins.bool):
