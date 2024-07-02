@@ -366,9 +366,6 @@ else:
                 window = cls.buffer(bufferid)
                 return "vertical {:d} resize {:d} | {:d} resize {:d}".format(window, state['width'], window, state['height'])
 
-# XXX: placeholder for modules that still depend on "internal" to access buffers, windows, and tabs.
-internal = vim
-
 # fd-like wrapper around vim buffer object
 class buffer(object):
     """vim buffer management"""

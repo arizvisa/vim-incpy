@@ -3,7 +3,6 @@ logger = logging.getLogger('incpy').getChild('vim')
 
 from . import interface, process
 
-internal = interface.internal
 vim = interface.vim
 
 # save initial state
@@ -24,7 +23,7 @@ class interpreter(object):
         opt.update(vim.gvars['incpy#WindowOptions'])
         opt.update(kwds.pop('opt', {}))
         kwds.setdefault('preview', vim.gvars['incpy#WindowPreview'])
-        kwds.setdefault('tab', internal.tab.getCurrent())
+        kwds.setdefault('tab', vim.tab.getCurrent())
         self.view = interface.view(kwds.pop('buffer', None) or vim.gvars['incpy#WindowName'], opt, **kwds)
 
     def write(self, data):
@@ -188,7 +187,7 @@ class terminal(external):
         self.__options.update(opt)
 
         kwds.setdefault('preview', vim.gvars['incpy#WindowPreview'])
-        kwds.setdefault('tab', internal.tab.getCurrent())
+        kwds.setdefault('tab', vim.tab.getCurrent())
         self.__keywords = kwds
         #self.__view = None
         self.buffer = None
@@ -197,26 +196,26 @@ class terminal(external):
     def view(self):
         #if self.__view:
         #    return self.__view
-        current = internal.window.current()
-        #internal.window.select(vim.gvars['incpy#WindowName'])
+        current = vim.window.current()
+        #vim.window.select(vim.gvars['incpy#WindowName'])
         #vim.command('terminal ++open ++noclose ++curwin')
         buffer = self.start() if self.buffer is None else self.buffer
         self.__view = res = interface.view(buffer, self.options, **self.__keywords)
-        internal.window.select(current)
+        vim.window.select(current)
         return res
 
     def attach(self):
         """Attaches interpreter to view"""
         view = self.view
         window = view.window
-        current = internal.window.current()
+        current = vim.window.current()
 
         # search to see if window exists, if it doesn't..then show it.
-        searched = internal.window.buffer(self.buffer)
+        searched = vim.window.buffer(self.buffer)
         if searched < 0:
             self.view.buffer = self.buffer
 
-        internal.window.select(current)
+        vim.window.select(current)
         # do nothing, always attached
 
     def detach(self):
