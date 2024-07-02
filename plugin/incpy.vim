@@ -545,6 +545,51 @@ def generate_package_loaders(module, path):
 EOF
 endfunction
 
+function! incpy#SetupInterpreter(module)
+    pythonx << EOF
+def install_interpreter(package_name):
+    package = __import__(package_name)
+    interface, interpreters = (__import__('.'.join([package.__name__, module])) for module in ['interface', 'interpreters'])
+
+    # grab the program specified by the user
+    program = interface.vim.gvars["incpy#Program"]
+
+    # spawn interpreter requested by user with the specified options
+    opt = {'winfixwidth':True, 'winfixheight':True} if interface.vim.gvars["incpy#WindowFixed"] > 0 else {}
+    try:
+        if interface.vim.eval('has("terminal")') and len(program) > 0:
+            cache = interpreters.terminal.new(program, opt=opt)
+        elif len(program) > 0:
+            cache = interpreters.external.new(program, opt=opt)
+        else:
+            cache = interpreters.python_internal.new(opt=opt)
+
+    # if we couldn't start the interpreter, then fall back to an internal one
+    except Exception:
+        logger.fatal("error starting external interpreter: {:s}".format(program), exc_info=True)
+        logger.warning("falling back to internal python interpreter")
+        cache = interpreters.python_internal.new(opt=opt)
+
+    # assign the interpreter object into our package
+    package.cache = cache
+EOF
+endfunction
+
+function! incpy#SetupInterpreterView(module)
+    pythonx << EOF
+def create_view(package_name):
+    package = __import__(package_name)
+    [interface] = (__import__('.'.join([package.__name__, module])) for module in ['interface'])
+
+    # grab the cached interpreter out of the package
+    cache = package.cache
+
+    # create its window and store its buffer id
+    interface.vim.gvars['incpy#BufferId'] = cache.view.buffer.number
+    cache.view.create(interface.vim.gvars['incpy#WindowPosition'], interface.vim.gvars['incpy#WindowRatio'])
+EOF
+endfunction
+
 function! incpy#SetupPython(currentscriptpath)
     " Set up the module search path to include the script's "python" directory
     let m = substitute(a:currentscriptpath, "\\", "/", "g")
