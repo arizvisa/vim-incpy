@@ -496,7 +496,7 @@ class view(object):
     encoding = encoding_descriptor()
     del(encoding_descriptor)
 
-    def __init__(self, buffer, opt, preview, tab=None):
+    def __init__(self, bufnum, opt, preview, tab=None):
         """Create a view for the specified buffer.
 
         Buffer can be an existing buffer, an id number, filename, or even a new name.
@@ -506,7 +506,7 @@ class view(object):
 
         # Get the vim.buffer from the buffer the caller gave us.
         try:
-            buf = internal.buffer.of(buffer)
+            buf = internal.buffer.of(bufnum)
 
         # If we couldn't find the desired buffer, then we'll just create one
         # with the name that we were given.
@@ -514,12 +514,12 @@ class view(object):
 
             # Create a buffer with the specified name. This is not really needed
             # as we're only creating it to sneak off with the buffer's name.
-            if isinstance(buffer, string_types):
-                buf = internal.buffer.new(buffer)
-            elif isinstance(buffer, integer_types):
+            if isinstance(bufnum, string_types):
+                buf = internal.buffer.new(bufnum)
+            elif isinstance(bufnum, integer_types):
                 buf = internal.buffer.new(vim.gvars['incpy#WindowName'])
             else:
-                raise vim.error("Unable to determine output buffer name from parameter : {!r}".format(buffer))
+                raise vim.error("Unable to determine output buffer name from parameter : {!r}".format(bufnum))
 
         # Now we can grab the buffer's name so that we can use it to re-create
         # the buffer if it was deleted by the user.
@@ -573,45 +573,45 @@ class view(object):
     # Methods wrapping the window visibility and its scope
     def create(self, position, ratio):
         """Create window for buffer"""
-        buffer = self.buffer
+        bufobj = self.buffer
 
         # FIXME: creating a view in another tab is not supported yet
-        if internal.buffer.number(buffer.number) == -1:
-            raise Exception("Buffer {:d} does not exist".format(buffer.number))
+        if internal.buffer.number(bufobj.number) == -1:
+            raise Exception("Buffer {:d} does not exist".format(bufobj.number))
         if 1.0 <= ratio < 0.0:
             raise Exception("Specified ratio is out of bounds {!r}".format(ratio))
 
         # create the window, get its buffer, and update our state with it.
-        window = internal.window.create(buffer.number, position, ratio, self.options, preview=self.preview)
+        window = internal.window.create(bufobj.number, position, ratio, self.options, preview=self.preview)
         self.buffer = vim.eval("winbufnr({:d})".format(window))
         return window
 
     def show(self, position, ratio):
         """Show window at the specified position if it is not already showing."""
-        buffer = self.buffer
+        bufobj = self.buffer
 
         # FIXME: showing a view in another tab is not supported yet
         # if buffer does not exist then recreate the fucker
-        if internal.buffer.number(buffer.number) == -1:
-            raise Exception("Buffer {:d} does not exist".format(buffer.number))
-        # if internal.buffer.window(buffer.number) != -1:
-        #    raise Exception("Window for {:d} is already showing".format(buffer.number))
+        if internal.buffer.number(bufobj.number) == -1:
+            raise Exception("Buffer {:d} does not exist".format(bufobj.number))
+        # if internal.buffer.window(bufobj.number) != -1:
+        #    raise Exception("Window for {:d} is already showing".format(bufobj.number))
 
-        window = internal.window.show(buffer.number, position, ratio, self.options, preview=self.preview)
+        window = internal.window.show(bufobj.number, position, ratio, self.options, preview=self.preview)
         self.buffer = vim.eval("winbufnr({:d})".format(window))
         return window
 
     def hide(self):
         """Hide the window"""
-        buffer = self.buffer
+        bufobj = self.buffer
 
         # FIXME: hiding a view in another tab is not supported yet
-        if internal.buffer.number(buffer.number) == -1:
-            raise Exception("Buffer {:d} does not exist".format(buffer.number))
-        if internal.buffer.window(buffer.number) == -1:
-            raise Exception("Window for {:d} is already hidden".format(buffer.number))
+        if internal.buffer.number(bufobj.number) == -1:
+            raise Exception("Buffer {:d} does not exist".format(bufobj.number))
+        if internal.buffer.window(bufobj.number) == -1:
+            raise Exception("Window for {:d} is already hidden".format(bufobj.number))
 
-        return internal.window.hide(buffer.number, preview=self.preview)
+        return internal.window.hide(bufobj.number, preview=self.preview)
 
     def __repr__(self):
         name = self.buffer.name
