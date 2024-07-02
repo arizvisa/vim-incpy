@@ -767,12 +767,24 @@ def generate_package_loaders(module, path):
             module.__dict__.update(self._namespace)
             return module
 
+    integer_types = tuple({type(sys.maxsize + n) for n in range(2)})
+    string_types = tuple({type(s) for s in ['', u'']})
+    text_types = tuple({t.__base__ for t in string_types}) if sys.version_info.major < 3 else string_types
+    ordinal_types = (string_types, bytes)
+
+    version_independent_types = {
+        'integer_types': integer_types,
+        'string_types': string_types,
+        'text_types': text_types,
+        'ordinal_types': ordinal_types,
+    }
+
     currentscriptpath = path
     files = [filename for filename in os.listdir(currentscriptpath) if filename.endswith('.py')]
     iterable = ((os.path.splitext(filename), os.path.join(currentscriptpath, filename)) for filename in files)
     submodules = {name : path for (name, ext), path in iterable}
     pythonx_finder = vim_plugin_support_finder(currentscriptpath, submodules)
-    yield vim_plugin_packager(module, [pythonx_finder])
+    yield vim_plugin_packager(module, [pythonx_finder], version_independent_types)
 EOF
 endfunction
 
