@@ -171,6 +171,18 @@ try:
         # misc variables (buffer, window, tab, script, vim)
         bvars, wvars, tvars, svars, vvars = map(_vars, 'bwtsv')
 
+        # dictionary
+        if hasattr(_vim, 'Diictionary'):
+            @classmethod
+            def Dictionary(cls, dict):
+                return _vim.Dictionary(dict)
+        else:
+            @classmethod
+            def Dictionary(cls, dict):
+                Frender = lambda value: "{!r}".format(value) if isinstance(value, string_types) else "{!s}".format(value)
+                rendered = [(Frender(key), Frender(value)) for key, value in dict.items() if isinstance(value, (string_types, integer_types))]
+                return cls.eval("{}{:s}{}".format('{', ','.join("{:s}:{:s}".format(*pair) for pair in rendered), '}'))
+
         # functions
         if hasattr(_vim, 'Function'):
             @classmethod
