@@ -1,8 +1,8 @@
 import sys, functools, itertools, operator
-import os, logging, codecs, weakref, time, itertools, shlex
-logger = logging.getLogger('incpy').getChild('py')
+import os, codecs, weakref, time, itertools, shlex
 
-from . import integer_types, string_types, reraise
+from . import integer_types, string_types, reraise, logger
+logger = logger.getChild(__name__)
 
 try:
     # make sure the user has selected the gevent-based version by importing gevent

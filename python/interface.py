@@ -1,7 +1,7 @@
-import sys, logging, functools, codecs
-logger = logging.getLogger('incpy').getChild('py')
+import sys, functools, codecs
+from . import integer_types, string_types, logger
 
-from . import integer_types, string_types
+logger = logger.getChild(__name__)
 
 try:
     import vim as _vim

@@ -1,9 +1,7 @@
 import sys, logging
-logger = logging.getLogger('incpy').getChild('vim')
+from . import interface, process, logger
 
-from . import interface, process
-
-vim = interface.vim
+vim, logger = interface.vim, logger.getChild(__name__)
 
 # save initial state
 state = tuple(getattr(sys, _) for _ in ['stdin', 'stdout', 'stderr'])
