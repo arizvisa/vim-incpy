@@ -509,8 +509,8 @@ def generate_package_loaders(package_name, package_path, plugin_name):
 
     # Create a namespace that we will execute our loader.py
     # script in. This is so we can treat it as a module.
-    class loader_t: pass
-    loader = loader_t()
+    class workspace: pass
+    loader = workspace()
     loader.path = os.path.join(package_path, 'loader.py')
 
     with builtins.open(loader.path, 'rt') as infile:
@@ -545,7 +545,13 @@ def generate_package_loaders(package_name, package_path, plugin_name):
     iterable = ((os.path.splitext(filename), os.path.join(package_path, filename)) for filename in files)
     submodules = {name : path for (name, ext), path in iterable}
     pythonx_finder = loader.vim_plugin_support_finder(package_path, submodules)
-    yield loader.vim_plugin_packager(package_name, [pythonx_finder], namespace)
+
+    # Then we do another to expose a temporary workspace
+    # that we can use to load code and other things into.
+    workspace_finder = loader.workspace_finder(workspace=loader)
+
+    # Now we can return a packager that wraps both finders.
+    yield loader.vim_plugin_packager(package_name, [pythonx_finder, workspace_finder], namespace)
 EOF
 endfunction
 
