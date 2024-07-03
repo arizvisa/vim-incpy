@@ -202,6 +202,87 @@ class vim_plugin_support_finder(object):
 
         return None
 
+class object_loader(object):
+    """
+    This class defines a generic loader that will always return
+    the object that it is constructed with as a fake module.
+    """
+    def __init__(self, state):
+        self.state = state
+    def create_module(self, spec):
+        return self.state
+    def exec_module(self, module):
+        return module
+    def load_module(self, fullname):
+        return self.state
+
+class module_loader(object):
+    """
+    This class defines a loader that will return a module
+    with its namespace composed of the provided dictionary.
+    """
+    def __init__(self, state):
+        self.state = state
+    def create_module(self, spec):
+        return None
+    def exec_module(self, module):
+        module.__dict__.update(self.state)
+        return module
+    def load_module(self, fullname):
+        module = python_import_machinery.new_module(fullname)
+        module.__dict__.update(self.state)
+        return module
+
+class workspace_finder(object):
+    """
+    This class is a finder and loader that can be appended
+    to the `sys.meta_path` list. It essentially allows building
+    ephemeral modules that are initialized with a namespace
+    that is specified as a dictionary.
+
+    The parameters for its constructor can be a list of
+    keywords, representing the module names and their
+    namespace, or some number of names followed by the
+    dictionary to use for their namespace.
+    """
+    def __init__(self, *args, **kwds):
+        self.modules = {}
+        self.objects = {}
+
+        # if there were any regular parameters, then convert them
+        # into a dictionary of keywords so that we can group them.
+        if args:
+            [names, workspace] = args if len(args) > 1 else itertools.chain(args, [None])
+            iterable = [names] if isinstance(names, (''.__class__, u''.__class__)) else names
+            kwds.update({name : workspace for name in names})
+
+        # iterate through our parameters collecting the instance
+        # for each provided object or a dictionary for each module.
+        for name, state in kwds.items():
+            if isinstance(state, None.__class__):
+                self.modules[name] = state or {}
+            else:
+                self.objects[name] = state
+            continue
+
+        # collect a set so that we can look up either by name
+        self.available = {name for name in itertools.chain(self.modules, self.objects)}
+    def has_loader(self, fullname):
+        return fullname in self.available
+    def get_loader(self, fullname):
+        if fullname in self.modules:
+            return module_loader(self.modules[fullname])
+        return object_loader(self.objects[fullname])
+    def find_module(self, fullname, path=None):
+        if self.has_loader(fullname):
+            return self.get_loader(fullname)
+        return None
+    def find_spec(self, fullname, path, target=None):
+        if self.has_loader(fullname):
+            loader = self.get_loader(fullname)
+            return python_import_machinery.module_spec(fullname, loader)
+        return None
+
 class vim_plugin_packager(object):
     """
     This class is intended to be used as a "meta_path" object
