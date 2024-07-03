@@ -272,25 +272,3 @@ class terminal(external):
         if job_status(job) != 'dead':
             raise Exception("Unable to terminate job {:d}".format(job))
         return
-
-# spawn interpreter requested by user
-_ = interface.vim.gvars["incpy#Program"]
-opt = {'winfixwidth':True, 'winfixheight':True} if interface.vim.gvars["incpy#WindowFixed"] > 0 else {}
-try:
-    if interface.vim.eval('has("terminal")') and len(_) > 0:
-        cache = terminal.new(_, opt=opt)
-    elif len(_) > 0:
-        cache = external.new(_, opt=opt)
-    else:
-        cache = python_internal.new(opt=opt)
-
-except Exception:
-    logger.fatal("error starting external interpreter: {:s}".format(_), exc_info=True)
-    logger.warning("falling back to internal python interpreter")
-    cache = python_internal.new(opt=opt)
-del(opt)
-
-# create it's window, and store the buffer's id
-view = cache.view
-interface.vim.gvars['incpy#BufferId'] = view.buffer.number
-view.create(interface.vim.gvars['incpy#WindowPosition'], interface.vim.gvars['incpy#WindowRatio'])
