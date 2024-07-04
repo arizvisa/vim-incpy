@@ -650,7 +650,7 @@ function! incpy#SetupInterpreterView(module)
     call s:execute_python_in_workspace(a:module, printf(join(create_view, "\n"), l:escaped_module))
 endfunction
 
-function! incpy#SetupPython(currentscriptpath)
+function! incpy#SetupPythonOld(currentscriptpath)
     " Set up the module search path to include the script's "python" directory
     let m = substitute(a:currentscriptpath, "\\", "/", "g")
 
@@ -727,7 +727,7 @@ function! incpy#SetupKeys()
 endfunction
 
 "" Define the whole python interface for the plugin
-function! incpy#Setup()
+function! incpy#SetupOld()
 
     " Set any the options for the python module part.
     if g:incpy#Greenlets
@@ -1481,8 +1481,8 @@ endfunction
 """ Actual execution and setup of the plugin
     let s:current_script=expand("<sfile>:p:h")
     call incpy#SetupOptions()
-    call incpy#SetupPython(s:current_script)
-    call incpy#Setup()
+    call incpy#SetupPythonOld(s:current_script)
+    call incpy#SetupOld()
     call incpy#SetupCommands()
     call incpy#SetupKeys()
 
