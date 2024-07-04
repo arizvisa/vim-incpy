@@ -498,6 +498,31 @@ function! s:execute_python_in_workspace(package, command)
     execute printf("pythonx (lambda F, ns: (lambda s: F(s, ns, ns)))(%s, %s)(%s)", l:python_execute, l:python_workspace, strings)
 endfunction
 
+function! s:execute_interpreter_cache(method, parameters)
+    let l:cache = [printf('__import__("%s")', '__incpy__'), 'cache']
+    let l:method = (type(a:method) == v:t_list)? a:method : [a:method]
+    call s:execute_python_in_workspace('__incpy__', printf('%s(%s)', join(l:cache + l:method, '.'), join(a:parameters, ', ')))
+endfunction
+
+function! s:execute_interpreter_cache_guarded(method, parameters)
+    let l:cache = [printf('__import__("%s")', '__incpy__'), 'cache']
+    let l:method = (type(a:method) == v:t_list)? a:method : [a:method]
+    call s:execute_python_in_workspace('__incpy__', printf("hasattr(%s, '%s') and %s(%s)", join(slice(l:cache, 0, -1), '.'), escape(l:cache[-1], '\'''), join(l:cache + l:method, '.'), join(a:parameters, ', ')))
+endfunction
+
+function! s:communicate_interpreter_encoded(format, code)
+    let l:cache = [printf('__import__("%s")', '__incpy__'), 'cache']
+    let l:encoded = substitute(a:code, '.', '\=printf("\\x%02x", char2nr(submatch(0)))', 'g')
+    let l:lambda = printf("(lambda interpreter: (lambda code: interpreter.communicate(code)))(%s)", join(cache, '.'))
+    execute printf("pythonx %s(\"%s\".format(\"%s\"))", l:lambda, a:format, l:encoded)
+endfunction
+
+function! s:generate_python_global(name)
+    let interface = [printf('__import__("%s")', join(['__incpy__', 'interface'], '.')), 'interface']
+    let gvars = ['vim', 'gvars']
+    return printf("%s[\"%s\"]", join(interface + gvars, '.'), escape(a:name, '"\'))
+endfunction
+
 """ Interface for setting up the plugin
 function! incpy#SetupOptions()
     " Set any default options for the plugin that the user missed
