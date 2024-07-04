@@ -349,6 +349,23 @@ function! s:python_strip_and_fix_indent(lines)
     return join(result, "\n") .. "\n"
 endfunction
 
+""" Utilities for escaping strings and such
+function! s:escape_single(string)
+    return escape(a:string, '''\')
+endfunction
+
+function! s:escape_double(string)
+    return escape(a:string, '"\')
+endfunction
+
+function! s:quote_single(string)
+    return printf("'%s'", escape(a:string, '''\'))
+endfunction
+
+function! s:quote_double(string)
+    return printf("\"%s\"", escape(a:string, '"\'))
+endfunction
+
 function! s:singleline(string, escape)
     " escape the multiline string with the specified characters and return it as a single-line string
     let escaped = escape(a:string, a:escape)
