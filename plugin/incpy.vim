@@ -718,10 +718,10 @@ endfunction
 
 function! incpy#ImportDotfile()
     " Check to see if a python site-user dotfile exists in the users home-directory.
-    let source = g:incpy#PythonStartup
-    if filereadable(source)
-        let input = printf("with open(%s) as infile: exec(infile.read())", s:quote_double(source))
-        execute printf("pythonx __incpy__.cache.communicate(%s, silent=True)", s:quote_single(input))
+    let dotfile = g:incpy#PythonStartup
+    if filereadable(dotfile)
+        let open_and_execute = printf("with open(%s) as infile: exec(infile.read())", s:quote_double(dotfile))
+        call s:execute_interpreter_cache('communicate', [s:quote_single(open_and_execute), 'silent=True'])
     endif
 endfunction
 
@@ -768,8 +768,6 @@ function! incpy#SetupPythonInterpreter(package)
     call incpy#SetupInterpreter(a:package)
     call incpy#SetupInterpreterView(a:package)
 
-    execute printf("pythonx import %s", a:package)
-
     " Set any the options for the python module part.
     if g:incpy#Greenlets
         " If greenlets were specified, then enable it by importing 'gevent' into the current python environment
@@ -783,32 +781,35 @@ endfunction
 """ Plugin management interface
 function! incpy#Start()
     " Start the target program and attach it to a buffer
-    pythonx __incpy__.cache.start()
+    call s:execute_interpreter_cache('start', [])
 endfunction
 
 function! incpy#Stop()
     " Stop the target program and detach it from its buffer
-    pythonx __incpy__.cache.stop()
+    call s:execute_interpreter_cache('stop', [])
 endfunction
 
 function! incpy#Restart()
-    " Restart the target program
-    pythonx __incpy__.cache.stop()
-    pythonx __incpy__.cache.start()
+    " Restart the target program by stopping and starting it
+    for method in ['stop', 'start']
+        call s:execute_interpreter_cache(method, [])
+    endfor
 endfunction
 
 """ Plugin interaction interface
 function! incpy#Show()
-    execute "pythonx __incpy__.cache.view.show(__incpy__.interface.vim.gvars['incpy#WindowPosition'], __incpy__.interface.vim.gvars['incpy#WindowRatio'])"
+    let parameters = map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_python_global(v:val)')
+    call s:execute_interpreter_cache(['view', 'show'], parameters)
 endfunction
 
 function! incpy#Hide()
-    execute "pythonx __incpy__.cache.view.hide()"
+    call s:execute_interpreter_cache(['view', 'hide'], [])
 endfunction
 
 function! incpy#Execute(line)
-    call incpy#Show()
-    execute printf("pythonx __incpy__.cache.communicate(%s)", s:quote_single(a:line))
+    call s:execute_interpreter_cache(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_python_global(v:val)'))
+
+    call s:execute_interpreter_cache('communicate', [s:quote_single(a:line)])
     if g:incpy#OutputFollow
         try | call s:windowtail(g:incpy#BufferId) | catch /^Invalid/ | endtry
     endif
@@ -826,24 +827,18 @@ function! incpy#Range(begin, end)
 
     " Strip our input prior to its execution.
     let code_stripped = s:strip_by_option(g:incpy#ExecStrip, input_stripped)
-    call incpy#Show()
+    call s:execute_interpreter_cache(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_python_global(v:val)'))
 
-    " If we've got a string, then execute it as a single line.
-    if type(code_stripped) == v:t_string
-        let encoded = substitute(printf("%s", code_stripped), '.', '\=printf("\\x%02x", char2nr(submatch(0)))', 'g')
-        execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#ExecFormat, "\"\\"), encoded)
-
-    " If it was a list, though, then execute our command multiple times.
-    elseif type(code_stripped) == v:t_list
-        for command_stripped in code_stripped
-            let encoded = substitute(printf("(%s)", command_stripped), '.', '\=printf("\\x%02x", char2nr(submatch(0)))', 'g')
-            execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#ExecFormat, "\"\\"), encoded)
-        endfor
-
-    " If it's anything else, then we don't support it.
-    else
+    " If it's not a list or a string, then we don't support it.
+    if !(type(code_stripped) == v:t_string || type(code_stripped) == v:t_list)
         throw printf("Unable to execute due to an unknown input type (%s): %s", typename(code_stripped), code_stripped)
     endif
+
+    " If we've got a string, then execute it as a single line.
+    let l:commands_stripped = (type(code_stripped) == v:t_list)? code_stripped : [code_stripped]
+    for command_stripped in l:commands_stripped
+        call s:communicate_interpreter_encoded(s:singleline(g:incpy#ExecFormat, "\"\\"), command_stripped)
+    endfor
 
     " If the user configured us to follow the output, then do as we were told.
     if g:incpy#OutputFollow
@@ -853,11 +848,10 @@ endfunction
 
 function! incpy#Evaluate(expr)
     let stripped = s:strip_by_option(g:incpy#EvalStrip, a:expr)
-    let encoded = substitute(printf("%s", stripped), '.', '\=printf("\\x%02x", char2nr(submatch(0)))', 'g')
 
     " Evaluate and emit an expression in the target using the plugin
-    call incpy#Show()
-    execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#EvalFormat, "\"\\"), encoded)
+    call s:execute_interpreter_cache(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_python_global(v:val)'))
+    call s:communicate_interpreter_encoded(s:singleline(g:incpy#EvalFormat, "\"\\"), stripped)
 
     if g:incpy#OutputFollow
         try | call s:windowtail(g:incpy#BufferId) | catch /^Invalid/ | endtry
@@ -877,8 +871,8 @@ function! incpy#Halp(expr)
     let LetMeSeeYouStripped = substitute(a:expr, '^[ \t\n]\+\|[ \t\n]\+$', '', 'g')
 
     " Execute g:incpy#HelpFormat in the target using the plugin's cached communicator
-    call incpy#Show()
-    execute printf("pythonx (lambda code=\"%s\".format(\"%s\"): __incpy__.cache.communicate(code))()", s:singleline(g:incpy#HelpFormat, "\"\\"), escape(LetMeSeeYouStripped, "\"\\"))
+    call s:execute_interpreter_cache(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_python_global(v:val)'))
+    call s:communicate_interpreter_encoded(s:singleline(g:incpy#HelpFormat, "\"\\"), escape(LetMeSeeYouStripped, "\"\\"))
 endfunction
 
 function! incpy#HalpSelected() range
@@ -900,8 +894,8 @@ endfunction
     endif
 
     " on entry, silently import the user module to honor any user-specific configurations
-    autocmd VimEnter * pythonx hasattr(__incpy__, 'cache') and __incpy__.cache.attach()
-    autocmd VimLeavePre * pythonx hasattr(__incpy__, 'cache') and __incpy__.cache.detach()
+    autocmd VimEnter * call s:execute_interpreter_cache_guarded('attach', [])
+    autocmd VimLeavePre * call s:execute_interpreter_cache_guarded('detach', [])
 
     " if greenlets were specifed then make sure to update them during cursor movement
     if g:incpy#Greenlets
