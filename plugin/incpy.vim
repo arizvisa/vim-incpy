@@ -454,6 +454,33 @@ function! s:pyexpr_under_cursor()
     return join([trimmed, join(order, '')], '')
 endfunction
 
+""" Utilities related to executing python
+function! s:execute_python_in_workspace(package, command)
+    let l:escaped_package = escape(a:package, '"\')
+    let l:multiline_command = split(a:command, "\n")
+    let l:workspace_module = escape(join([a:package, 'workspace'], '.'), '"\')
+
+    " Guard whatever it is we were asked to execute by
+    " ensuring that our module workspace has been loaded.
+    execute printf("pythonx __builtins__.__import__(\"%s\").exec_", l:escaped_package)
+    execute printf("pythonx __builtins__.__import__(\"%s\")", l:workspace_module)
+
+    " If our command contains 3x single or double-quotes, then
+    " we format our strings with the one that isn't used.
+    if stridx(a:command, '"""') < 0
+        let strings = printf("%s\n%s\n%s", 'r"""', join(l:multiline_command, "\n"), '"""')
+    else
+        let strings = printf("%s\n%s\n%s", "r'''", join(l:multiline_command, "\n"), "'''")
+    endif
+
+    " Now we need to render our multilined list of commands to
+    " a multilined string, and then execute it in our workspace.
+    let l:python_execute = join(['__builtins__', printf("__import__(\"%s\")", l:escaped_package), 'exec_'], '.')
+    let l:python_workspace = join(['__builtins__', printf("__import__(\"%s\")", l:workspace_module), 'workspace', '__dict__'], '.')
+
+    execute printf("pythonx (lambda F, ns: (lambda s: F(s, ns, ns)))(%s, %s)(%s)", l:python_execute, l:python_workspace, strings)
+endfunction
+
 """ Interface for setting up the plugin
 function! incpy#SetupOptions()
     " Set any default options for the plugin that the user missed
