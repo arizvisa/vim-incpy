@@ -473,14 +473,13 @@ endfunction
 
 """ Utilities related to executing python
 function! s:execute_python_in_workspace(package, command)
-    let l:escaped_package = escape(a:package, '"\')
     let l:multiline_command = split(a:command, "\n")
-    let l:workspace_module = escape(join([a:package, 'workspace'], '.'), '"\')
+    let l:workspace_module = join([a:package, 'workspace'], '.')
 
     " Guard whatever it is we were asked to execute by
     " ensuring that our module workspace has been loaded.
-    execute printf("pythonx __builtins__.__import__(\"%s\").exec_", l:escaped_package)
-    execute printf("pythonx __builtins__.__import__(\"%s\")", l:workspace_module)
+    execute printf("pythonx __builtins__.__import__(%s).exec_", s:quote_single(a:package))
+    execute printf("pythonx __builtins__.__import__(%s)", s:quote_single(l:workspace_module))
 
     " If our command contains 3x single or double-quotes, then
     " we format our strings with the one that isn't used.
@@ -492,35 +491,35 @@ function! s:execute_python_in_workspace(package, command)
 
     " Now we need to render our multilined list of commands to
     " a multilined string, and then execute it in our workspace.
-    let l:python_execute = join(['__builtins__', printf("__import__(\"%s\")", l:escaped_package), 'exec_'], '.')
-    let l:python_workspace = join(['__builtins__', printf("__import__(\"%s\")", l:workspace_module), 'workspace', '__dict__'], '.')
+    let l:python_execute = join(['__builtins__', printf("__import__(%s)", s:quote_single(a:package)), 'exec_'], '.')
+    let l:python_workspace = join(['__builtins__', printf("__import__(%s)", s:quote_single(l:workspace_module)), 'workspace', '__dict__'], '.')
 
     execute printf("pythonx (lambda F, ns: (lambda s: F(s, ns, ns)))(%s, %s)(%s)", l:python_execute, l:python_workspace, strings)
 endfunction
 
 function! s:execute_interpreter_cache(method, parameters)
-    let l:cache = [printf('__import__("%s")', g:incpy#PackageName), 'cache']
+    let l:cache = [printf('__import__(%s)', s:quote_single(g:incpy#PackageName)), 'cache']
     let l:method = (type(a:method) == v:t_list)? a:method : [a:method]
     call s:execute_python_in_workspace(g:incpy#PackageName, printf('%s(%s)', join(l:cache + l:method, '.'), join(a:parameters, ', ')))
 endfunction
 
 function! s:execute_interpreter_cache_guarded(method, parameters)
-    let l:cache = [printf('__import__("%s")', g:incpy#PackageName), 'cache']
+    let l:cache = [printf('__import__(%s)', s:quote_single(g:incpy#PackageName)), 'cache']
     let l:method = (type(a:method) == v:t_list)? a:method : [a:method]
-    call s:execute_python_in_workspace(g:incpy#PackageName, printf("hasattr(%s, '%s') and %s(%s)", join(slice(l:cache, 0, -1), '.'), escape(l:cache[-1], '\'''), join(l:cache + l:method, '.'), join(a:parameters, ', ')))
+    call s:execute_python_in_workspace(g:incpy#PackageName, printf("hasattr(%s, %s) and %s(%s)", join(slice(l:cache, 0, -1), '.'), s:quote_single(l:cache[-1]), join(l:cache + l:method, '.'), join(a:parameters, ', ')))
 endfunction
 
 function! s:communicate_interpreter_encoded(format, code)
-    let l:cache = [printf('__import__("%s")', g:incpy#PackageName), 'cache']
+    let l:cache = [printf('__import__(%s)', s:quote_single(g:incpy#PackageName)), 'cache']
     let l:encoded = substitute(a:code, '.', '\=printf("\\x%02x", char2nr(submatch(0)))', 'g')
     let l:lambda = printf("(lambda interpreter: (lambda code: interpreter.communicate(code)))(%s)", join(cache, '.'))
     execute printf("pythonx %s(\"%s\".format(\"%s\"))", l:lambda, a:format, l:encoded)
 endfunction
 
 function! s:generate_python_global(name)
-    let interface = [printf('__import__("%s")', join([g:incpy#PackageName, 'interface'], '.')), 'interface']
+    let interface = [printf('__import__(%s)', s:quote_single(join([g:incpy#PackageName, 'interface'], '.'))), 'interface']
     let gvars = ['vim', 'gvars']
-    return printf("%s[\"%s\"]", join(interface + gvars, '.'), escape(a:name, '"\'))
+    return printf("%s[%s]", join(interface + gvars, '.'), s:quote_double(a:name))
 endfunction
 
 """ Interface for setting up the plugin
@@ -542,9 +541,9 @@ function! incpy#SetupOptions()
     let defopts["WindowPreview"] = v:false
     let defopts["WindowFixed"] = 0
 
-    let python_builtins = "__import__(\"builtins\")"
-    let python_pydoc = "__import__(\"pydoc\")"
-    let python_sys = "__import__(\"sys\")"
+    let python_builtins = printf("__import__(%s)", s:quote_single('builtins'))
+    let python_pydoc = printf("__import__(%s)", s:quote_single('pydoc'))
+    let python_sys = printf("__import__(%s)", s:quote_single('sys'))
     let defopts["HelpFormat"] = printf("%s.getpager = lambda: %s.plainpager\ntry:exec(\"%s.help({0})\")\nexcept SyntaxError:%s.help(\"{0}\")\n\n", python_pydoc, python_pydoc, escape(python_builtins, "\"\\"), python_builtins)
 
     let defopts["InputStrip"] = function("s:python_strip_and_fix_indent")
@@ -644,10 +643,9 @@ function! incpy#SetupPackageLoader(package, path)
 endfunction
 
 function! incpy#SetupInterpreter(module)
-    let l:escaped_module = escape(a:module, '"\')
 
     let install_interpreter =<< trim EOC
-        __import__, package_name = __builtins__['__import__'], "%s"
+        __import__, package_name = __builtins__['__import__'], %s
         package = __import__(package_name)
         interface, interpreters = (getattr(__import__('.'.join([package.__name__, module])), module) for module in ['interface', 'interpreters'])
 
@@ -674,14 +672,13 @@ function! incpy#SetupInterpreter(module)
         package.cache = cache
     EOC
 
-    call s:execute_python_in_workspace(a:module, printf(join(install_interpreter, "\n"), l:escaped_module))
+    call s:execute_python_in_workspace(a:module, printf(join(install_interpreter, "\n"), s:quote_single(a:module)))
 endfunction
 
 function! incpy#SetupInterpreterView(module)
-    let l:escaped_module = escape(a:module, '"\')
 
     let create_view =<< trim EOC
-        __import__, package_name = __builtins__['__import__'], "%s"
+        __import__, package_name = __builtins__['__import__'], %s
         package = __import__(package_name)
         [interface] = (getattr(__import__('.'.join([package.__name__, module])), module) for module in ['interface'])
 
@@ -693,7 +690,7 @@ function! incpy#SetupInterpreterView(module)
         cache.view.create(interface.vim.gvars['incpy#WindowPosition'], interface.vim.gvars['incpy#WindowRatio'])
     EOC
 
-    call s:execute_python_in_workspace(a:module, printf(join(create_view, "\n"), l:escaped_module))
+    call s:execute_python_in_workspace(a:module, printf(join(create_view, "\n"), s:quote_single(a:module)))
 endfunction
 
 function! incpy#SetupPythonLoader(package, currentscriptpath)
@@ -723,8 +720,8 @@ function! incpy#ImportDotfile()
     " Check to see if a python site-user dotfile exists in the users home-directory.
     let source = g:incpy#PythonStartup
     if filereadable(source)
-        let input = printf("with open(\"%s\") as infile: exec(infile.read())", escape(source, "\"\\"))
-        execute printf("pythonx __incpy__.cache.communicate('%s', silent=True)", escape(input, "'\\"))
+        let input = printf("with open(%s) as infile: exec(infile.read())", s:quote_double(source))
+        execute printf("pythonx __incpy__.cache.communicate(%s, silent=True)", s:quote_single(input))
     endif
 endfunction
 
@@ -811,7 +808,7 @@ endfunction
 
 function! incpy#Execute(line)
     call incpy#Show()
-    execute printf("pythonx __incpy__.cache.communicate('%s')", escape(a:line, "'\\"))
+    execute printf("pythonx __incpy__.cache.communicate(%s)", s:quote_single(a:line))
     if g:incpy#OutputFollow
         try | call s:windowtail(g:incpy#BufferId) | catch /^Invalid/ | endtry
     endif
