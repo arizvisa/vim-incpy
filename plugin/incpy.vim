@@ -499,34 +499,38 @@ function! s:execute_python_in_workspace(package, command)
 endfunction
 
 function! s:execute_interpreter_cache(method, parameters)
-    let l:cache = [printf('__import__("%s")', '__incpy__'), 'cache']
+    let l:cache = [printf('__import__("%s")', g:incpy#PackageName), 'cache']
     let l:method = (type(a:method) == v:t_list)? a:method : [a:method]
-    call s:execute_python_in_workspace('__incpy__', printf('%s(%s)', join(l:cache + l:method, '.'), join(a:parameters, ', ')))
+    call s:execute_python_in_workspace(g:incpy#PackageName, printf('%s(%s)', join(l:cache + l:method, '.'), join(a:parameters, ', ')))
 endfunction
 
 function! s:execute_interpreter_cache_guarded(method, parameters)
-    let l:cache = [printf('__import__("%s")', '__incpy__'), 'cache']
+    let l:cache = [printf('__import__("%s")', g:incpy#PackageName), 'cache']
     let l:method = (type(a:method) == v:t_list)? a:method : [a:method]
-    call s:execute_python_in_workspace('__incpy__', printf("hasattr(%s, '%s') and %s(%s)", join(slice(l:cache, 0, -1), '.'), escape(l:cache[-1], '\'''), join(l:cache + l:method, '.'), join(a:parameters, ', ')))
+    call s:execute_python_in_workspace(g:incpy#PackageName, printf("hasattr(%s, '%s') and %s(%s)", join(slice(l:cache, 0, -1), '.'), escape(l:cache[-1], '\'''), join(l:cache + l:method, '.'), join(a:parameters, ', ')))
 endfunction
 
 function! s:communicate_interpreter_encoded(format, code)
-    let l:cache = [printf('__import__("%s")', '__incpy__'), 'cache']
+    let l:cache = [printf('__import__("%s")', g:incpy#PackageName), 'cache']
     let l:encoded = substitute(a:code, '.', '\=printf("\\x%02x", char2nr(submatch(0)))', 'g')
     let l:lambda = printf("(lambda interpreter: (lambda code: interpreter.communicate(code)))(%s)", join(cache, '.'))
     execute printf("pythonx %s(\"%s\".format(\"%s\"))", l:lambda, a:format, l:encoded)
 endfunction
 
 function! s:generate_python_global(name)
-    let interface = [printf('__import__("%s")', join(['__incpy__', 'interface'], '.')), 'interface']
+    let interface = [printf('__import__("%s")', join([g:incpy#PackageName, 'interface'], '.')), 'interface']
     let gvars = ['vim', 'gvars']
     return printf("%s[\"%s\"]", join(interface + gvars, '.'), escape(a:name, '"\'))
 endfunction
 
 """ Interface for setting up the plugin
 function! incpy#SetupOptions()
-    " Set any default options for the plugin that the user missed
     let defopts = {}
+
+    let defopts["PackageName"] = '__incpy__'
+    let defopts["PluginName"] = 'incpy'
+
+    " Set any default options for the plugin that the user missed
     let defopts["Program"] = ""
     let defopts["Greenlets"] = v:false
     let defopts["Echo"] = v:true
@@ -537,10 +541,11 @@ function! incpy#SetupOptions()
     let defopts["WindowOptions"] = {}
     let defopts["WindowPreview"] = v:false
     let defopts["WindowFixed"] = 0
+
     let python_builtins = "__import__(\"builtins\")"
     let python_pydoc = "__import__(\"pydoc\")"
-    let defopts["HelpFormat"] = printf("%s.getpager = lambda: %s.plainpager\ntry:exec(\"%s.help({0})\")\nexcept SyntaxError:%s.help(\"{0}\")\n\n", python_pydoc, python_pydoc, escape(python_builtins, "\"\\"), python_builtins)
     let python_sys = "__import__(\"sys\")"
+    let defopts["HelpFormat"] = printf("%s.getpager = lambda: %s.plainpager\ntry:exec(\"%s.help({0})\")\nexcept SyntaxError:%s.help(\"{0}\")\n\n", python_pydoc, python_pydoc, escape(python_builtins, "\"\\"), python_builtins)
 
     let defopts["InputStrip"] = function("s:python_strip_and_fix_indent")
     let defopts["EchoFormat"] = "# >>> {}"
@@ -572,7 +577,6 @@ function! incpy#SetupOptions()
 endfunction
 
 function! incpy#SetupPackageLoader(package, path)
-    let PLUGIN_NAME = "incpy"
     let [l:package_name, l:package_path] = [a:package, fnamemodify(a:path, ":p")]
 
     " Generate a closure that we will use to update the meta_path.
@@ -632,7 +636,7 @@ function! incpy#SetupPackageLoader(package, path)
     " create a hidden module to capture any python-specific work.
     let escaped_package_name = escape(l:package_name, '"\')
     let escaped_package_path = escape(l:package_path, '"\')
-    let escaped_plugin_name = escape(PLUGIN_NAME, '"\')
+    let escaped_plugin_name = escape(g:incpy#PluginName, '"\')
     execute printf("pythonx __import__('sys').meta_path.extend(generate_package_loaders(\"%s\", \"%s\", \"%s\"))", escaped_package_name, escaped_package_path, escaped_plugin_name)
 
     " Now that it's been used, we're free to delete it.
@@ -888,8 +892,8 @@ endfunction
     let s:current_script=expand("<sfile>:p:h")
 
     call incpy#SetupOptions()
-    call incpy#SetupPythonLoader('__incpy__', s:current_script)
-    call incpy#SetupPythonInterpreter('__incpy__')
+    call incpy#SetupPythonLoader(g:incpy#PackageName, s:current_script)
+    call incpy#SetupPythonInterpreter(g:incpy#PackageName)
     call incpy#SetupCommands()
     call incpy#SetupKeys()
 
