@@ -502,7 +502,11 @@ function! incpy#SetupOptions()
     endfor
 endfunction
 
-function! incpy#SetupPackageLoader(package, currentscriptpath)
+function! incpy#SetupPackageLoader(package, path)
+    let PLUGIN_NAME = "incpy"
+    let [l:package_name, l:package_path] = [a:package, fnamemodify(a:path, ":p")]
+
+    " Generate a closure that we will use to update the meta_path.
 pythonx << EOF
 def generate_package_loaders(package_name, package_path, plugin_name):
     import builtins, os, sys, six
@@ -553,6 +557,16 @@ def generate_package_loaders(package_name, package_path, plugin_name):
     # Now we can return a packager that wraps both finders.
     yield loader.vim_plugin_packager(package_name, [pythonx_finder, workspace_finder], namespace)
 EOF
+
+    " Next we need to use it with our parameters so that we can
+    " create a hidden module to capture any python-specific work.
+    let escaped_package_name = escape(l:package_name, '"\')
+    let escaped_package_path = escape(l:package_path, '"\')
+    let escaped_plugin_name = escape(PLUGIN_NAME, '"\')
+    execute printf("pythonx __import__('sys').meta_path.extend(generate_package_loaders(\"%s\", \"%s\", \"%s\"))", escaped_package_name, escaped_package_path, escaped_plugin_name)
+
+    " Now that it's been used, we're free to delete it.
+    pythonx del(generate_package_loaders)
 endfunction
 
 function! incpy#SetupInterpreter(module)
