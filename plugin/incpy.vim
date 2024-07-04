@@ -597,50 +597,56 @@ EOF
 endfunction
 
 function! incpy#SetupInterpreter(module)
-    pythonx << EOF
-def install_interpreter(package_name):
-    builtins = __builtins__
-    package = builtins.__import__(package_name)
-    interface, interpreters = (builtins.__import__('.'.join([package.__name__, module])) for module in ['interface', 'interpreters'])
+    let l:escaped_module = escape(a:module, '"\')
 
-    # grab the program specified by the user
-    program = interface.vim.gvars["incpy#Program"]
+    let install_interpreter =<< trim EOC
+        __import__, package_name = __builtins__['__import__'], "%s"
+        package = __import__(package_name)
+        interface, interpreters = (getattr(__import__('.'.join([package.__name__, module])), module) for module in ['interface', 'interpreters'])
 
-    # spawn interpreter requested by user with the specified options
-    opt = {'winfixwidth':True, 'winfixheight':True} if interface.vim.gvars["incpy#WindowFixed"] > 0 else {}
-    try:
-        if interface.vim.eval('has("terminal")') and len(program) > 0:
-            cache = interpreters.terminal.new(program, opt=opt)
-        elif len(program) > 0:
-            cache = interpreters.external.new(program, opt=opt)
-        else:
+        # grab the program specified by the user
+        program = interface.vim.gvars["incpy#Program"]
+
+        # spawn interpreter requested by user with the specified options
+        opt = {'winfixwidth':True, 'winfixheight':True} if interface.vim.gvars["incpy#WindowFixed"] > 0 else {}
+        try:
+            if interface.vim.eval('has("terminal")') and len(program) > 0:
+                cache = interpreters.terminal.new(program, opt=opt)
+            elif len(program) > 0:
+                cache = interpreters.external.new(program, opt=opt)
+            else:
+                cache = interpreters.python_internal.new(opt=opt)
+
+        # if we couldn't start the interpreter, then fall back to an internal one
+        except Exception:
+            logger.fatal("error starting external interpreter: {:s}".format(program), exc_info=True)
+            logger.warning("falling back to internal python interpreter")
             cache = interpreters.python_internal.new(opt=opt)
 
-    # if we couldn't start the interpreter, then fall back to an internal one
-    except Exception:
-        logger.fatal("error starting external interpreter: {:s}".format(program), exc_info=True)
-        logger.warning("falling back to internal python interpreter")
-        cache = interpreters.python_internal.new(opt=opt)
+        # assign the interpreter object into our package
+        package.cache = cache
+    EOC
 
-    # assign the interpreter object into our package
-    package.cache = cache
-EOF
+    call s:execute_python_in_workspace(a:module, printf(join(install_interpreter, "\n"), l:escaped_module))
 endfunction
 
 function! incpy#SetupInterpreterView(module)
-    pythonx << EOF
-def create_view(package_name):
-    builtins = __builtins__
-    package = builtins.__import__(package_name)
-    [interface] = (builtins.__import__('.'.join([package.__name__, module])) for module in ['interface'])
+    let l:escaped_module = escape(a:module, '"\')
 
-    # grab the cached interpreter out of the package
-    cache = package.cache
+    let create_view =<< trim EOC
+        __import__, package_name = __builtins__['__import__'], "%s"
+        package = __import__(package_name)
+        [interface] = (getattr(__import__('.'.join([package.__name__, module])), module) for module in ['interface'])
 
-    # create its window and store its buffer id
-    interface.vim.gvars['incpy#BufferId'] = cache.view.buffer.number
-    cache.view.create(interface.vim.gvars['incpy#WindowPosition'], interface.vim.gvars['incpy#WindowRatio'])
-EOF
+        # grab the cached interpreter out of the package
+        cache = package.cache
+
+        # create its window and store its buffer id
+        interface.vim.gvars['incpy#BufferId'] = cache.view.buffer.number
+        cache.view.create(interface.vim.gvars['incpy#WindowPosition'], interface.vim.gvars['incpy#WindowRatio'])
+    EOC
+
+    call s:execute_python_in_workspace(a:module, printf(join(create_view, "\n"), l:escaped_module))
 endfunction
 
 function! incpy#SetupPython(currentscriptpath)
