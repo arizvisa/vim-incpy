@@ -524,7 +524,8 @@ function! s:communicate_interpreter_encoded(format, code)
     execute printf("pythonx %s(\"%s\".format(\"%s\"))", l:lambda, a:format, l:encoded)
 endfunction
 
-function! s:generate_python_global(name)
+" Just a utility for generating a python expression that accesses a vim global variable
+function! s:generate_gvar_expression(name)
     let interface = [printf('__import__(%s)', s:quote_single(join([g:incpy#PackageName, 'interface'], '.'))), 'interface']
     let gvars = ['vim', 'gvars']
     return printf("%s[%s]", join(interface + gvars, '.'), s:quote_double(a:name))
@@ -667,7 +668,7 @@ function! incpy#Restart()
 endfunction
 
 function! incpy#Show()
-    let parameters = map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_python_global(v:val)')
+    let parameters = map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)')
     call s:execute_interpreter_cache(['view', 'show'], parameters)
 endfunction
 
@@ -677,7 +678,7 @@ endfunction
 
 """ Plugin interaction interface
 function! incpy#Execute(line)
-    call s:execute_interpreter_cache(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_python_global(v:val)'))
+    call s:execute_interpreter_cache(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
 
     call s:execute_interpreter_cache('communicate', [s:quote_single(a:line)])
     if g:incpy#OutputFollow
@@ -697,7 +698,7 @@ function! incpy#Range(begin, end)
 
     " Strip our input prior to its execution.
     let code_stripped = s:strip_by_option(g:incpy#ExecStrip, input_stripped)
-    call s:execute_interpreter_cache(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_python_global(v:val)'))
+    call s:execute_interpreter_cache(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
 
     " If it's not a list or a string, then we don't support it.
     if !(type(code_stripped) == v:t_string || type(code_stripped) == v:t_list)
@@ -720,7 +721,7 @@ function! incpy#Evaluate(expr)
     let stripped = s:strip_by_option(g:incpy#EvalStrip, a:expr)
 
     " Evaluate and emit an expression in the target using the plugin
-    call s:execute_interpreter_cache(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_python_global(v:val)'))
+    call s:execute_interpreter_cache(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
     call s:communicate_interpreter_encoded(s:singleline(g:incpy#EvalFormat, "\"\\"), stripped)
 
     if g:incpy#OutputFollow
@@ -742,7 +743,7 @@ function! incpy#Halp(expr)
 
     " Execute g:incpy#HelpFormat in the target using the plugin's cached communicator
     if len(LetMeSeeYouStripped) > 0
-        call s:execute_interpreter_cache(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_python_global(v:val)'))
+        call s:execute_interpreter_cache(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
         call s:communicate_interpreter_encoded(s:singleline(g:incpy#HelpFormat, "\"\\"), s:escape_double(LetMeSeeYouStripped))
     endif
 endfunction
