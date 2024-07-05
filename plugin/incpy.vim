@@ -834,25 +834,16 @@ endfunction
 
 function! incpy#SetupPythonLoader(package, currentscriptpath)
     " Set up the module search path to include the script's "python" directory
-    let m = substitute(a:currentscriptpath, "\\", "/", "g")
+    let l:slashes = substitute(a:currentscriptpath, "\\", "/", "g")
 
-    " add the python path using the runtimepath directory that this script is contained in
-    for p in split(&runtimepath, ",")
-        let p = substitute(p, "\\", "/", "g")
-        if stridx(m, p, 0) == 0
-            call incpy#SetupPackageLoader(a:package, p)
-            return
-        endif
-    endfor
-
-    " otherwise, look up from our current script's directory for a python sub-directory
-    let p = finddir("python", m . ";")
-    if isdirectory(p)
-        call incpy#SetupPackageLoader(a:package, p)
+    " Look up from our current script's directory for a python sub-directory
+    let python_dir = finddir("python", printf("%s;", l:slashes))
+    if isdirectory(python_dir)
+        call incpy#SetupPackageLoader(a:package, python_dir)
         return
     endif
 
-    throw printf("Unable to determine basepath from script %s", m)
+    throw printf("Unable to determine basepath from script %s", l:slashes)
 endfunction
 
 function! incpy#SetupPythonInterpreter(package)
