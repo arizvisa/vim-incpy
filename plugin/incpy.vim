@@ -541,18 +541,16 @@ function! incpy#SetupOptions()
     let defopts["WindowPreview"] = v:false
     let defopts["WindowFixed"] = 0
 
-    let python_builtins = printf("__import__(%s)", s:quote_single('builtins'))
-    let python_pydoc = printf("__import__(%s)", s:quote_single('pydoc'))
-    let python_sys = printf("__import__(%s)", s:quote_single('sys'))
-    let defopts["HelpFormat"] = printf("%s.getpager = lambda: %s.plainpager\ntry:exec(\"%s.help({0})\")\nexcept SyntaxError:%s.help(\"{0}\")\n\n", python_pydoc, python_pydoc, escape(python_builtins, "\"\\"), python_builtins)
+    let python_builtins = printf("__import__(%s)", s:quote_double('builtins'))
+    let python_pydoc = printf("__import__(%s)", s:quote_double('pydoc'))
+    let python_sys = printf("__import__(%s)", s:quote_double('sys'))
+    let python_help = join([python_builtins, 'help'], '.')
+    let defopts["HelpFormat"] = printf("%s.getpager = lambda: %s.plainpager\ntry:exec(\"%s({0})\")\nexcept SyntaxError:%s(\"{0}\")\n\n", python_pydoc, python_pydoc, escape(python_help, "\"\\"), python_help)
 
     let defopts["InputStrip"] = function("s:python_strip_and_fix_indent")
     let defopts["EchoFormat"] = "# >>> {}"
     let defopts["EchoNewline"] = "{}\n"
-    " let defopts["EvalFormat"] = printf("_={};print _')", python_builtins, python_builtins, python_builtins)
-    " let defopts["EvalFormat"] = printf("__incpy__.sys.displayhook({})')")
-    " let defopts["EvalFormat"] = printf("__incpy__.builtins._={};print __incpy__.__builtin__._")
-    let defopts["EvalFormat"] = printf("%s.displayhook({})\n", python_sys)
+    let defopts["EvalFormat"] = printf("%s.displayhook(({}))\n", python_sys)
     let defopts["EvalStrip"] = v:false
     let defopts["ExecFormat"] = "{}\n"
     let defopts["ExecStrip"] = v:false
@@ -871,8 +869,10 @@ function! incpy#Halp(expr)
     let LetMeSeeYouStripped = substitute(a:expr, '^[ \t\n]\+\|[ \t\n]\+$', '', 'g')
 
     " Execute g:incpy#HelpFormat in the target using the plugin's cached communicator
-    call s:execute_interpreter_cache(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_python_global(v:val)'))
-    call s:communicate_interpreter_encoded(s:singleline(g:incpy#HelpFormat, "\"\\"), escape(LetMeSeeYouStripped, "\"\\"))
+    if len(LetMeSeeYouStripped) > 0
+        call s:execute_interpreter_cache(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_python_global(v:val)'))
+        call s:communicate_interpreter_encoded(s:singleline(g:incpy#HelpFormat, "\"\\"), s:escape_double(LetMeSeeYouStripped))
+    endif
 endfunction
 
 function! incpy#HalpSelected() range
