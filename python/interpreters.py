@@ -6,15 +6,21 @@ vim, logger = interface.vim, logger.getChild(__name__)
 # save initial state
 state = tuple(getattr(sys, _) for _ in ['stdin', 'stdout', 'stderr'])
 
+def get_interpreter_frame(*args):
+    [frame] = args if args else [sys._getframe()]
+    while frame.f_back:
+        frame = frame.f_back
+    return frame
+
 # interpreter classes
 class interpreter(object):
     # options that are used for constructing the view
     view_options = ['buffer', 'opt', 'preview', 'tab']
 
     @classmethod
-    def new(cls, **options):
+    def new(cls, *args, **options):
         options.setdefault('buffer', None)
-        return cls(**options)
+        return cls(*args, **options)
 
     def __init__(self, **kwds):
         opt = {}.__class__(vim.gvars['incpy#CoreWindowOptions'])
@@ -56,6 +62,20 @@ class interpreter(object):
 
 class python_internal(interpreter):
     state = None
+
+    def __init__(self, *args, **kwds):
+        super(python_internal, self).__init__(**kwds)
+
+        if len(args) not in {0, 1, 2, min(sys.version_info.major, 3)}:
+            (lambda source, globals, locals: None)('', *args)
+            raise Exception
+
+        elif not args:
+            frame = get_interpreter_frame()
+            args = [getattr(frame, attribute) for attribute in ['f_globals', 'f_locals']]
+
+        globals, locals = 2 * args if len(args) < 2 else args[:2]
+        self.__workspace__ = [globals, locals, None if len(args) < 3 else args[-1]][:min(sys.version_info.major, 3)]
 
     def attach(self):
         self.state = sys.stdin, sys.stdout, sys.stderr, logger
@@ -100,7 +120,9 @@ class python_internal(interpreter):
             trimmed = next(iterable, 0)
             echo = '\n'.join(map(echoformat.format, lines[:-trimmed] if trimmed > 0 else lines))
             self.write(echonewline.format(echo))
-        exec(data, globals())   # FIXME: need the namespace to write things to
+
+        globals, locals, closure = (self.__workspace__ + 3 * [None])[:3]
+        exec("exec(data, globals, locals{:s})".format(', closure=closure' if sys.version_info.major >= 3 and sys.version_info.minor >= 11 else ''))
 
     def start(self):
         logger.warning("internal interpreter has already been (implicitly) started")
