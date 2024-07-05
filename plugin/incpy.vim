@@ -101,197 +101,7 @@
 
 if has("python") || has("python3")
 
-""" Utility functions for indentation stuff
-function! s:count_indent(string)
-    " count the whitespace that prefixes a single-line string
-    let characters = 0
-    for c in split(a:string, '\zs')
-        if stridx(" \t", c) == -1
-            break
-        endif
-        let characters += 1
-    endfor
-    return characters
-endfunction
-
-function! s:find_common_indent(lines)
-    " find the smallest common indent of a list of strings
-    let smallestindent = -1
-    for l in a:lines
-        " skip lines that are all whitespace
-        if strlen(l) == 0 || l =~ '^\s\+$'
-            continue
-        endif
-
-        let spaces = s:count_indent(l)
-        if smallestindent < 0 || spaces < smallestindent
-            let smallestindent = spaces
-        endif
-    endfor
-    return smallestindent
-endfunction
-
-function! s:strip_common_indent(lines, size)
-    " strip the specified number of characters from a list of lines
-
-    let results = []
-    let prevlength = 0
-
-    " iterate through each line
-    for l in a:lines
-
-        " if the line is empty, then pad it with the previous indent
-        if strlen(l) == 0
-            let row = repeat(" ", prevlength)
-
-        " otherwise remove the requested size, and count the leftover indent
-        else
-            let row = strpart(l, a:size)
-            let prevlength = s:count_indent(row)
-        endif
-
-        " append our row to the list of results
-        let results += [row]
-    endfor
-    return results
-endfunction
-
-function! s:python_strip_and_fix_indent(lines)
-    let indentsize = s:find_common_indent(a:lines)
-    let stripped = s:strip_common_indent(a:lines, indentsize)
-
-    " trim any beginning lines that are meaningless
-    let l:start = 0
-    for l:index in range(len(stripped))
-        let l:item = stripped[l:index]
-        if strlen(l:item) > 0 && l:item !~ '^\s\+$'
-            break
-        endif
-        let l:start += 1
-    endfor
-
-    " trim any ending lines that are meaningless
-    let l:tail = 0
-    for l:index in range(len(stripped))
-        let l:tail += 1
-        let l:item = stripped[-(1 + l:index)]
-        if strlen(l:item) > 0 && l:item !~ '^\s\+$'
-            break
-        endif
-    endfor
-
-    " if the last line is indented, then we append another newline (python)
-    let trimmed = split(trim(join(stripped[l:start : -l:tail], "\n"), " \t\n", 2), "\n")
-    if len(trimmed) > 0 && trimmed[-1] =~ '^\s\+'
-        let result = add(trimmed, '')
-    else
-        let result = trimmed
-    endif
-    return join(result, "\n") .. "\n"
-endfunction
-
-function! s:striplist_by_option(option, lines)
-    let items = a:lines
-
-    " Strip the fetched lines if the user configured us to
-    if type(a:option) == v:t_bool
-        let result = a:option == v:true? map(items, "trim(v:val)") : items
-
-    " If the type is a string, then use it as a regex that
-    elseif type(a:option) == v:t_string
-        let result = map(items, a:option)
-
-    " Otherwise it's a function to use as a transformation
-    elseif type(a:option) == v:t_func
-        let F = a:option
-        let result = F(items)
-
-    " Anything else is an unsupported filtering option.
-    else
-        throw printf("Unable to strip lines using an unknown filtering option (%s): %s", typename(a:option), a:option)
-    endif
-
-    return result
-endfunction
-
-function! s:stripstring_by_option(option, string)
-    if type(a:option) == v:t_bool
-        let result = a:option == v:true? trim(a:string) : a:string
-
-    elseif type(a:option) == v:t_string
-        let expression = a:option
-        let results = map([a:string], expression)
-        let result = results[0]
-
-    elseif type(a:option) == v:t_func
-        let F = a:option
-        let result = F(a:string)
-
-    else
-        throw printf("Unable to strip string due to an unknown filtering option (%s): %s", typename(a:option), a:option)
-    endif
-    return result
-endfunction
-
-function! s:strip_by_option(option, input)
-    if type(a:input) == v:t_list
-        let result = s:striplist_by_option(a:option, a:input)
-    elseif type(a:input) == v:t_string
-        let result = s:stripstring_by_option(a:option, a:input)
-    else
-        throw printf("Unknown parameter type: %s", type(a:input))
-    endif
-    return result
-endfunction
-
-""" Window management
-function! s:windowselect(id)
-
-    " check if we were given a bunk window id
-    if a:id == -1
-        throw printf("Invalid window identifier %d", a:id)
-    endif
-
-    " select the requested window id, return the previous window id
-    let current = winnr()
-    execute printf("%d wincmd w", a:id)
-    return current
-endfunction
-
-function! s:windowtail(bufid)
-
-    " if we were given a bunk buffer id, then we need to bitch
-    " because we can't select it or anything
-    if a:bufid == -1
-        throw printf("Invalid buffer identifier %d", a:bufid)
-    endif
-
-    " tail the window that's using the specified buffer id
-    let last = s:windowselect(bufwinnr(a:bufid))
-    if winnr() == bufwinnr(a:bufid)
-        keepjumps noautocmd normal gg
-        keepjumps noautocmd normal G
-        call s:windowselect(last)
-
-    " check which tabs the buffer is in
-    else
-        call s:windowselect(last)
-
-        let tc = tabpagenr()
-        for tn in range(tabpagenr('$'))
-            if index(tabpagebuflist(1 + tn), a:bufid) > -1
-                execute printf("tabnext %d", tn)
-                let tl = s:windowselect(bufwinnr(a:bufid))
-                keepjumps noautocmd normal gg
-                keepjumps noautocmd normal G
-                call s:windowselect(tl)
-            endif
-        endfor
-        execute printf("tabnext %d", tc)
-    endif
-endfunction
-
-""" Miscellanous utilities
+""" Utilities for dealing with visual-mode selection
 function! s:selected() range
     " really, vim? really??
     let oldvalue = getreg("")
@@ -349,11 +159,299 @@ function! s:selected_block() range
     return selection
 endfunction
 
+""" Utilities for window management
+function! s:windowselect(id)
+
+    " check if we were given a bunk window id
+    if a:id == -1
+        throw printf("Invalid window identifier %d", a:id)
+    endif
+
+    " select the requested window id, return the previous window id
+    let current = winnr()
+    execute printf("%d wincmd w", a:id)
+    return current
+endfunction
+
+function! s:windowtail(bufid)
+
+    " if we were given a bunk buffer id, then we need to bitch
+    " because we can't select it or anything
+    if a:bufid == -1
+        throw printf("Invalid buffer identifier %d", a:bufid)
+    endif
+
+    " tail the window that's using the specified buffer id
+    let last = s:windowselect(bufwinnr(a:bufid))
+    if winnr() == bufwinnr(a:bufid)
+        keepjumps noautocmd normal gg
+        keepjumps noautocmd normal G
+        call s:windowselect(last)
+
+    " check which tabs the buffer is in
+    else
+        call s:windowselect(last)
+
+        let tc = tabpagenr()
+        for tn in range(tabpagenr('$'))
+            if index(tabpagebuflist(1 + tn), a:bufid) > -1
+                execute printf("tabnext %d", tn)
+                let tl = s:windowselect(bufwinnr(a:bufid))
+                keepjumps noautocmd normal gg
+                keepjumps noautocmd normal G
+                call s:windowselect(tl)
+            endif
+        endfor
+        execute printf("tabnext %d", tc)
+    endif
+endfunction
+
+""" Utility functions for indentation, stripping, string processing, etc.
+function! s:count_indent(string)
+    " count the whitespace that prefixes a single-line string
+    let characters = 0
+    for c in split(a:string, '\zs')
+        if stridx(" \t", c) == -1
+            break
+        endif
+        let characters += 1
+    endfor
+    return characters
+endfunction
+
+function! s:find_common_indent(lines)
+    " find the smallest common indent of a list of strings
+    let smallestindent = -1
+    for l in a:lines
+        " skip lines that are all whitespace
+        if strlen(l) == 0 || l =~ '^\s\+$'
+            continue
+        endif
+
+        let spaces = s:count_indent(l)
+        if smallestindent < 0 || spaces < smallestindent
+            let smallestindent = spaces
+        endif
+    endfor
+    return smallestindent
+endfunction
+
+function! s:strip_common_indent(lines, size)
+    " strip the specified number of characters from a list of lines
+
+    let results = []
+    let prevlength = 0
+
+    " iterate through each line
+    for l in a:lines
+
+        " if the line is empty, then pad it with the previous indent
+        if strlen(l) == 0
+            let row = repeat(" ", prevlength)
+
+        " otherwise remove the requested size, and count the leftover indent
+        else
+            let row = strpart(l, a:size)
+            let prevlength = s:count_indent(row)
+        endif
+
+        " append our row to the list of results
+        let results += [row]
+    endfor
+    return results
+endfunction
+
+function! s:striplist_by_option(option, lines)
+    let items = a:lines
+
+    " Strip the fetched lines if the user configured us to
+    if type(a:option) == v:t_bool
+        let result = a:option == v:true? map(items, "trim(v:val)") : items
+
+    " If the type is a string, then use it as a regex that
+    elseif type(a:option) == v:t_string
+        let result = map(items, a:option)
+
+    " Otherwise it's a function to use as a transformation
+    elseif type(a:option) == v:t_func
+        let F = a:option
+        let result = F(items)
+
+    " Anything else is an unsupported filtering option.
+    else
+        throw printf("Unable to strip lines using an unknown filtering option (%s): %s", typename(a:option), a:option)
+    endif
+
+    return result
+endfunction
+
+function! s:stripstring_by_option(option, string)
+    if type(a:option) == v:t_bool
+        let result = a:option == v:true? trim(a:string) : a:string
+
+    elseif type(a:option) == v:t_string
+        let expression = a:option
+        let results = map([a:string], expression)
+        let result = results[0]
+
+    elseif type(a:option) == v:t_func
+        let F = a:option
+        let result = F(a:string)
+
+    else
+        throw printf("Unable to strip string due to an unknown filtering option (%s): %s", typename(a:option), a:option)
+    endif
+    return result
+endfunction
+
+function! s:strip_by_option(option, input)
+    if type(a:input) == v:t_list
+        let result = s:striplist_by_option(a:option, a:input)
+    elseif type(a:input) == v:t_string
+        let result = s:stripstring_by_option(a:option, a:input)
+    else
+        throw printf("Unknown parameter type: %s", type(a:input))
+    endif
+    return result
+endfunction
+
+function! s:python_strip_and_fix_indent(lines)
+    let indentsize = s:find_common_indent(a:lines)
+    let stripped = s:strip_common_indent(a:lines, indentsize)
+
+    " trim any beginning lines that are meaningless
+    let l:start = 0
+    for l:index in range(len(stripped))
+        let l:item = stripped[l:index]
+        if strlen(l:item) > 0 && l:item !~ '^\s\+$'
+            break
+        endif
+        let l:start += 1
+    endfor
+
+    " trim any ending lines that are meaningless
+    let l:tail = 0
+    for l:index in range(len(stripped))
+        let l:tail += 1
+        let l:item = stripped[-(1 + l:index)]
+        if strlen(l:item) > 0 && l:item !~ '^\s\+$'
+            break
+        endif
+    endfor
+
+    " if the last line is indented, then we append another newline (python)
+    let trimmed = split(trim(join(stripped[l:start : -l:tail], "\n"), " \t\n", 2), "\n")
+    if len(trimmed) > 0 && trimmed[-1] =~ '^\s\+'
+        let result = add(trimmed, '')
+    else
+        let result = trimmed
+    endif
+    return join(result, "\n") .. "\n"
+endfunction
+
 function! s:singleline(string, escape)
     " escape the multiline string with the specified characters and return it as a single-line string
     let escaped = escape(a:string, a:escape)
     let result = substitute(escaped, "\n", "\\\\n", "g")
     return result
+endfunction
+
+""" Miscellaneous utilities related to python
+function! s:keyword_under_cursor()
+    let res = expand("<cexpr>")
+    return len(res)? res : expand("<cword>")
+endfunction
+
+function! s:pyexpr_under_cursor()
+    let [cword, l:line, cpos] = [expand("<cexpr>"), getline(line('.')), col('.') - 1]
+
+    " Patterns which are used to find pieces of the expression. We depend on the
+    " iskeyword character set always placing us at the beginning of an identifier.
+    let pattern_conversion = ['-', '+', '~']
+    let pattern_group = ['()', '[]', '{}']
+
+    "" The logic for trying to determine the quotes for a string is pretty screwy.
+    let pattern_string = ['''', '"']
+
+    " Start out by splitting up our pattern group into a list that can be used.
+    let _pattern_begin_list = reduce(pattern_group, { items, pair -> items + [pair[0]] }, [])
+    let _pattern_end_list = reduce(pattern_group, { items, pair -> items + [pair[1]] }, [])
+
+    " Figure out where the beginning of the current expression is at.
+    let rpos = strridx(l:line, cword, cpos)
+    if rpos >= 0 && cpos - rpos < len(cword)
+        let start = strridx(l:line, cword, cpos)
+    else
+        let start = stridx(l:line, cword, cpos)
+    endif
+
+    " If we're at the beginning of a string or a group, then trust what the user gave us.
+    if index(_pattern_begin_list + pattern_string, l:line[cpos]) >= 0
+        let start = cpos
+
+    " Otherwise, use the current expression. But if there's a sign in front, then use it.
+    else
+        let start = (index(pattern_conversion, l:line[start - 1]) < 0)? start : start - 1
+    endif
+
+    " Find the ending (space, quote, terminal-grouping) from `start` and trim spaces for the result.
+    let stop = match(l:line, printf('[[:space:]%s]', join(pattern_string + map(copy(pattern_group), 'printf("\\%s", v:val[1])'), '')), start)
+    let result = trim(l:line[start : stop])
+
+    " If the result is an empty string, then strip quotes and bail with what we fetched.
+    let _pattern_string = join(pattern_string, '')
+    if match(result, printf('^[%s]\+$', pattern_string)) >= 0
+        return trim(result, _pattern_string)
+    endif
+
+    " Otherwise we need to scan for the beginning and ending to determine the quoting type.
+    let prefix = (start > 0)? matchstr(l:line[: start - 1], printf('[%s]\+$', _pattern_string)) : ''
+    let trailer = matchstr(result, printf('[%s]\+$', _pattern_string))
+
+    " If we have a prefix then trust it first. For python if the length >= 3, and it's duplicated,
+    " then we trim it. Otherwise we can just take the first quote type that we found and use that.
+    if len(prefix)
+        if len(prefix < 3) || match(prefix, printf("^[%s]\{3\}", prefix[0])) < 0
+            let [lside, rside] = [prefix[0], prefix[0]]
+        else
+            let [lside, rside] = [prefix[:3], prefix[:3]]
+        endif
+
+        return join([lside, trim(result, _pattern_string), rside], '')
+
+    " If we got a trailer without the prefix, then scan for its terminator and update the result.
+    elseif len(trailer)
+        let qindex = stridx(l:line, trailer, stop + 1)
+        let result = (qindex < 0)? result : join([result, strpart(l:line, stop + 1, qindex)], '')
+    endif
+
+    " Otherwise we count everything... ignoring how they are nested because we're writing fucking vimscript.
+    let counts = {}
+    for pair in pattern_group
+        let counts[pair[0]] = count(result, pair[0])
+        let counts[pair[1]] = count(result, pair[1])
+    endfor
+
+    " If there aren't any begin-group characters, then we can just trim and return it.
+    if reduce(_pattern_begin_list, { total, character -> total + counts[character] }, 0) == 0
+        return trim(result, join(_pattern_end_list, ''))
+    endif
+
+    " Otherwise, we've hit the worst-case and we need to iterate through the result to
+    " collect the order we close the expression with and map them to the right character.
+    let [order, _pattern_group_table] = [[], {}]
+    for pair in pattern_group | let _pattern_group_table[pair[0]] = pair[1] | endfor
+
+    " Push them onto a stack instead of appending to a list in order to save a reverse.
+    for character in result
+        if index(_pattern_begin_list, character) >= 0
+            let order = [_pattern_group_table[character]] + order
+        endif
+    endfor
+
+    " Now we can trim and append the determined order to our result.
+    let trimmed = trim(result, join(_pattern_end_list, ''), 2)
+    return join([trimmed, join(order, '')], '')
 endfunction
 
 """ Interface for setting up the plugin
@@ -457,103 +555,6 @@ function! incpy#SetupCommands()
     command -range PyEvalSelection call incpy#Evaluate(s:selected())
     command -nargs=1 PyHelp call incpy#Halp(<q-args>)
     command -range PyHelpSelection <line1>,<line2>call incpy#HalpSelected()
-endfunction
-
-function! s:keyword_under_cursor()
-    let res = expand("<cexpr>")
-    return len(res)? res : expand("<cword>")
-endfunction
-
-function! s:pyexpr_under_cursor()
-    let [cword, l:line, cpos] = [expand("<cexpr>"), getline(line('.')), col('.') - 1]
-
-    " Patterns which are used to find pieces of the expression. We depend on the
-    " iskeyword character set always placing us at the beginning of an identifier.
-    let pattern_conversion = ['-', '+', '~']
-    let pattern_group = ['()', '[]', '{}']
-
-    "" The logic for trying to determine the quotes for a string is pretty screwy.
-    let pattern_string = ['''', '"']
-
-    " Start out by splitting up our pattern group into a list that can be used.
-    let _pattern_begin_list = reduce(pattern_group, { items, pair -> items + [pair[0]] }, [])
-    let _pattern_end_list = reduce(pattern_group, { items, pair -> items + [pair[1]] }, [])
-
-    " Figure out where the beginning of the current expression is at.
-    let rpos = strridx(l:line, cword, cpos)
-    if rpos >= 0 && cpos - rpos < len(cword)
-        let start = strridx(l:line, cword, cpos)
-    else
-        let start = stridx(l:line, cword, cpos)
-    endif
-
-    " If we're at the beginning of a string or a group, then trust what the user gave us.
-    if index(_pattern_begin_list + pattern_string, l:line[cpos]) >= 0
-        let start = cpos
-
-    " Otherwise, use the current expression. But if there's a sign in front, then use it.
-    else
-        let start = (index(pattern_conversion, l:line[start - 1]) < 0)? start : start - 1
-    endif
-
-    " Find the ending (space, quote, terminal-grouping) from `start` and trim spaces for the result.
-    let stop = match(l:line, printf('[[:space:]%s]', join(pattern_string + map(copy(pattern_group), 'printf("\\%s", v:val[1])'), '')), start)
-    let result = trim(l:line[start : stop])
-
-    " If the result is an empty string, then strip quotes and bail with what we fetched.
-    let _pattern_string = join(pattern_string, '')
-    if match(result, printf('^[%s]\+$', pattern_string)) >= 0
-        return trim(result, _pattern_string)
-    endif
-
-    " Otherwise we need to scan for the beginning and ending to determine the quoting type.
-    let prefix = (start > 0)? matchstr(l:line[: start - 1], printf('[%s]\+$', _pattern_string)) : ''
-    let trailer = matchstr(result, printf('[%s]\+$', _pattern_string))
-
-    " If we have a prefix then trust it first. For python if the length >= 3, and it's duplicated,
-    " then we trim it. Otherwise we can just take the first quote type that we found and use that.
-    if len(prefix)
-        if len(prefix < 3) || match(prefix, printf("^[%s]\{3\}", prefix[0])) < 0
-            let [lside, rside] = [prefix[0], prefix[0]]
-        else
-            let [lside, rside] = [prefix[:3], prefix[:3]]
-        endif
-
-        return join([lside, trim(result, _pattern_string), rside], '')
-
-    " If we got a trailer without the prefix, then scan for its terminator and update the result.
-    elseif len(trailer)
-        let qindex = stridx(l:line, trailer, stop + 1)
-        let result = (qindex < 0)? result : join([result, strpart(l:line, stop + 1, qindex)], '')
-    endif
-
-    " Otherwise we count everything... ignoring how they are nested because we're writing fucking vimscript.
-    let counts = {}
-    for pair in pattern_group
-        let counts[pair[0]] = count(result, pair[0])
-        let counts[pair[1]] = count(result, pair[1])
-    endfor
-
-    " If there aren't any begin-group characters, then we can just trim and return it.
-    if reduce(_pattern_begin_list, { total, character -> total + counts[character] }, 0) == 0
-        return trim(result, join(_pattern_end_list, ''))
-    endif
-
-    " Otherwise, we've hit the worst-case and we need to iterate through the result to
-    " collect the order we close the expression with and map them to the right character.
-    let [order, _pattern_group_table] = [[], {}]
-    for pair in pattern_group | let _pattern_group_table[pair[0]] = pair[1] | endfor
-
-    " Push them onto a stack instead of appending to a list in order to save a reverse.
-    for character in result
-        if index(_pattern_begin_list, character) >= 0
-            let order = [_pattern_group_table[character]] + order
-        endif
-    endfor
-
-    " Now we can trim and append the determined order to our result.
-    let trimmed = trim(result, join(_pattern_end_list, ''), 2)
-    return join([trimmed, join(order, '')], '')
 endfunction
 
 function! incpy#SetupKeys()
