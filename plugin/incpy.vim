@@ -99,7 +99,15 @@
 "   buffer so that management of multiple program buffers would be local to
 "   whatever the user is currently editing.
 
-if has("python") || has("python3")
+if exists("g:loaded_incpy") && g:loaded_incpy
+    finish
+endif
+let g:loaded_incpy = v:true
+
+if !(has("python") || has("python3"))
+    echoerr "Vim compiled without +python support. Unable to initialize plugin from ". expand("<sfile>")
+    finish
+endif
 
 """ Utilities for dealing with visual-mode selection
 function! s:selected() range
@@ -880,6 +888,7 @@ function! incpy#HalpSelected() range
 endfunction
 
 """ Actual execution and setup of the plugin
+function! incpy#LoadPlugin()
     let s:current_script=expand("<sfile>:p:h")
 
     call incpy#SetupOptions()
@@ -904,7 +913,6 @@ endfunction
         autocmd CursorMoved * pythonx __import__('gevent').idle(0.0)
         autocmd CursorMovedI * pythonx __import__('gevent').idle(0.0)
     endif
+endfunction
 
-else
-    echoerr "Vim compiled without +python support. Unable to initialize plugin from ". expand("<sfile>")
-endif
+call incpy#LoadPlugin()
