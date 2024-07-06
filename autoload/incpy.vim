@@ -420,6 +420,20 @@ function! incpy#Execute(line)
     endif
 endfunction
 
+function! incpy#ExecuteRange() range
+    call incpy#Range(a:firstline, a:lastline)
+endfunction
+
+function! incpy#ExecuteBlock() range
+    let l:block = s:selected_block()
+    throw printf('Block range execution is currently not implemented')
+endfunction
+
+function! incpy#ExecuteSelected() range
+    let l:block = s:selected()
+    throw printf('Selection range execution is currently not implemented')
+endfunction
+
 function! incpy#Evaluate(expr)
     let stripped = s:strip_by_option(g:incpy#EvalStrip, a:expr)
 
