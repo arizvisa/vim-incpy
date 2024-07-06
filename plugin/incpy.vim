@@ -764,6 +764,11 @@ function! incpy#HalpSelected() range
     return incpy#Halp(join(s:selected()))
 endfunction
 
+function! incpy#ExecuteFile(filename)
+    let open_and_execute = printf("with open(%s) as infile: exec(infile.read())", s:quote_double(a:filename))
+    call s:execute_interpreter_cache('communicate', [s:quote_single(open_and_execute), 'silent=True'])
+endfunction
+
 """ Internal interface for setting up the plugin loader and packages
 function! incpy#SetupPackageLoader(package, path)
     let [l:package_name, l:package_path] = [a:package, fnamemodify(a:path, ":p")]
