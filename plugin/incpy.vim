@@ -477,14 +477,18 @@ endfunction
 function! incpy#SetupCommands()
     command PyLine call incpy#Range(line("."), line("."))
     command PyBuffer call incpy#Range(0, line('$'))
+    command -range PyRange call incpy#Range(<line1>, <line2>)
 
     command -nargs=1 Py call incpy#Execute(<q-args>)
-    command -range PyRange call incpy#Range(<line1>, <line2>)
+    command -range PyExecuteRange <line1>,<line2>call incpy#ExecuteRange()
+    command -range PyExecuteBlock <line1>,<line2>call incpy#ExecuteBlock()
+    command -range PyExecuteSelection <line1>,<line2>call incpy#ExecuteSelected()
 
     command -nargs=1 PyEval call incpy#Evaluate(<q-args>)
     command -range PyEvalRange <line1>,<line2>call incpy#EvaluateRange()
     command -range PyEvalBlock <line1>,<line2>call incpy#EvaluateBlock()
-    command -range PyEvalSelection call incpy#Evaluate(s:selected())
+    command -range PyEvalSelection <line1>,<line2>call incpy#EvaluateSelected()
+
     command -nargs=1 PyHelp call incpy#Halp(<q-args>)
     command -range PyHelpSelection <line1>,<line2>call incpy#HalpSelected()
 endfunction
