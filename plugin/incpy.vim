@@ -849,17 +849,22 @@ function! incpy#SetupPythonLoader(package, currentscriptpath)
 endfunction
 
 function! incpy#SetupPythonInterpreter(package)
+
+    " If greenlets were specified, then make it visible by importing `gevent
+    " into the current python environment via sys.modules.
+    if g:incpy#Greenlets
+        pythonx __import__('gevent')
+
+    " Otherwise, we only need to warn the user about using it if they're
+    " trying to run an external program without having the terminal api.
+    elseif len(g:incpy#Program) > 0 && !has("terminal")
+        echohl WarningMsg | echomsg printf('WARNING:%s:Using plugin to run an external program without support for greenlets could be unstable', g:incpy#PluginName) | echohl None
+    endif
+
+    " Now we can setup the interpreter and its view.
     call incpy#SetupInterpreter(a:package)
     call incpy#SetupInterpreterView(a:package)
 
-    " Set any the options for the python module part.
-    if g:incpy#Greenlets
-        " If greenlets were specified, then enable it by importing 'gevent' into the current python environment
-        pythonx __import__('gevent')
-    elseif g:incpy#Program != "" && !has("terminal")
-        " Otherwise we only need to warn the user that they should use it if they're trying to run an external program
-        echohl WarningMsg | echomsg printf('WARNING:%s:Using plugin to run an external program without support for greenlets could be unstable', g:incpy#PluginName) | echohl None
-    endif
 endfunction
 
 "" Mapping of vim commands and keys
