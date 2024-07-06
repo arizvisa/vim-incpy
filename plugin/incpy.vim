@@ -63,7 +63,6 @@
 " file. The available options are as follows.
 "
 " string g:incpy#Program      -- name of subprogram (if empty, use vim's internal python).
-" bool   g:incpy#Greenlets    -- whether to use greenlets (lightweight-threads) or not.
 " bool   g:incpy#OutputFollow -- flag that specifies to tail the output of the subprogram.
 " any    g:incpy#InputStrip   -- when executing input, specify whether to strip leading indentation.
 " bool   g:incpy#Echo         -- when executing input, echo it to the "Scratch" buffer.
@@ -83,6 +82,10 @@
 " string g:incpy#WindowPosition -- the position at which to create the window. can be
 "                                  either "above", "below", "left", or "right".
 " string g:incpy#PythonStartup  -- the name of the dotfile to seed python's globals with.
+"
+" bool   g:incpy#Terminal   -- whether to use the terminal api for external interpreters.
+" bool   g:incpy#Greenlets  -- whether to use greenlets for external interpreters.
+"
 " string g:incpy#PluginName     -- the internal name of the plugin, used during logging.
 " string g:incpy#PackageName    -- the internal package name, found in sys.modules.
 "
@@ -595,16 +598,17 @@ function! s:generate_interpreter_cache_snippet(package)
 
         # grab the program specified by the user
         program = interface.vim.gvars["incpy#Program"]
+        use_terminal = interface.vim.eval('has("terminal")') and interface.vim.gvars["incpy#Terminal"]
 
         # spawn interpreter requested by user with the specified options
         opt = {'winfixwidth':True, 'winfixheight':True} if interface.vim.gvars["incpy#WindowFixed"] > 0 else {}
         try:
-            if interface.vim.eval('has("terminal")') and len(program) > 0:
-                cache = interpreters.terminal.new(program, opt=opt)
-            elif len(program) > 0:
-                cache = interpreters.external.new(program, opt=opt)
+            if len(program) > 0:
+                interpreter = interpreters.terminal if use_terminal else interpreters.external
+                cache = interpreter.new(program, opt=opt)
             else:
-                cache = interpreters.python_internal.new(opt=opt)
+                interpreter = interpreters.python_internal
+                cache = interpreter.new(opt=opt)
 
         # if we couldn't start the interpreter, then fall back to an internal one
         except Exception:
@@ -786,7 +790,6 @@ function! incpy#SetupOptions()
 
     " Set any default options for the plugin that the user missed
     let defopts["Program"] = ""
-    let defopts["Greenlets"] = v:false
     let defopts["Echo"] = v:true
     let defopts["OutputFollow"] = v:true
     let defopts["WindowName"] = "Scratch"
@@ -795,6 +798,9 @@ function! incpy#SetupOptions()
     let defopts["WindowOptions"] = {}
     let defopts["WindowPreview"] = v:false
     let defopts["WindowFixed"] = 0
+
+    let defopts["Greenlets"] = v:false
+    let defopts["Terminal"] = has('terminal')
 
     let python_builtins = printf("__import__(%s)", s:quote_double('builtins'))
     let python_pydoc = printf("__import__(%s)", s:quote_double('pydoc'))
