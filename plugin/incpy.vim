@@ -756,18 +756,17 @@ endfunction
 function! incpy#SetupPackageLoader(package, path)
     let [l:package_name, l:package_path] = [a:package, fnamemodify(a:path, ":p")]
 
-    let definition = s:generate_package_loader_function('generate_package_loaders')
-    execute printf("pythonx %s", definition)
+    let l:loader_closure_name = 'generate_package_loaders'
+    let l:loader_closure_definition = s:generate_package_loader_function(l:loader_closure_name)
+    execute printf("pythonx %s", l:loader_closure_definition)
 
     " Next we need to use it with our parameters so that we can
     " create a hidden module to capture any python-specific work.
-    let escaped_package_name = escape(l:package_name, '"\')
-    let escaped_package_path = escape(l:package_path, '"\')
-    let escaped_plugin_name = escape(g:incpy#PluginName, '"\')
-    execute printf("pythonx __import__('sys').meta_path.extend(generate_package_loaders(\"%s\", \"%s\", \"%s\"))", escaped_package_name, escaped_package_path, escaped_plugin_name)
+    let quoted_parameters = map([l:package_name, l:package_path, g:incpy#PluginName], 's:quote_double(v:val)')
+    execute printf("pythonx __import__(%s).meta_path.extend(%s(%s))", s:quote_single('sys'), l:loader_closure_name, join(quoted_parameters, ', '))
 
     " Now that it's been used, we're free to delete it.
-    pythonx del(generate_package_loaders)
+    execute printf("pythonx del(%s)", l:loader_closure_name)
 endfunction
 
 "" Setting up the interpreter and its view
