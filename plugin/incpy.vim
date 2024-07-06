@@ -645,15 +645,6 @@ endfunction
 
 """ Public interface and management
 
-" Check to see if a python site-user dotfile exists in the users home-directory.
-function! incpy#ImportDotfile()
-    let dotfile = g:incpy#PythonStartup
-    if filereadable(dotfile)
-        let open_and_execute = printf("with open(%s) as infile: exec(infile.read())", s:quote_double(dotfile))
-        call s:execute_interpreter_cache('communicate', [s:quote_single(open_and_execute), 'silent=True'])
-    endif
-endfunction
-
 " Start the target program and attach it to a buffer
 function! incpy#Start()
     call s:execute_interpreter_cache('start', [])
@@ -926,6 +917,15 @@ function! incpy#SetupKeys()
     " Normal and visual mode mappings for everything else
     nnoremap <C-S-@> :call incpy#Halp(<SID>keyword_under_cursor())<C-M>
     vnoremap <C-S-@> :PyHelpSelection<C-M>
+endfunction
+
+" Check to see if a python site-user dotfile exists in the users home-directory.
+function! incpy#ImportDotfile()
+    let dotfile = g:incpy#PythonStartup
+    if filereadable(dotfile)
+        let open_and_execute = printf("with open(%s) as infile: exec(infile.read())", s:quote_double(dotfile))
+        call s:execute_interpreter_cache('communicate', [s:quote_single(open_and_execute), 'silent=True'])
+    endif
 endfunction
 
 "" Entry point
