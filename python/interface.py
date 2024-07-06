@@ -292,6 +292,7 @@ else:
                         vim.command("noautocmd silent {:s} pedit! +setlocal\\ {:s} {:s}".format(cls.positionToLocation(position), cls.optionsToCommandLine(options), vim.buffer.name(bufferid)))
                     else:
                         vim.command("noautocmd silent {:s} pedit! {:s}".format(cls.positionToLocation(position), vim.buffer.name(bufferid)))
+                    vim.command("noautocmd silent! wincmd P")
                 else:
                     if len(options) > 0:
                         vim.command("noautocmd silent {:s} {:d}{:s}! +setlocal\\ {:s} {:s}".format(cls.positionToLocation(position), int(size), cls.positionToSplit(position), cls.optionsToCommandLine(options), vim.buffer.name(bufferid)))
