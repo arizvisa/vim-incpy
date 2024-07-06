@@ -83,6 +83,8 @@
 " string g:incpy#WindowPosition -- the position at which to create the window. can be
 "                                  either "above", "below", "left", or "right".
 " string g:incpy#PythonStartup  -- the name of the dotfile to seed python's globals with.
+" string g:incpy#PluginName     -- the internal name of the plugin, used during logging.
+" string g:incpy#PackageName    -- the internal package name, found in sys.modules.
 "
 " Todo:
 " - When the filetype of the current buffer was specified, the target output buffer
@@ -103,11 +105,6 @@ if exists("g:loaded_incpy") && g:loaded_incpy
     finish
 endif
 let g:loaded_incpy = v:true
-
-if !(has("python") || has("python3"))
-    echoerr "Vim compiled without +python support. Unable to initialize plugin from ". expand("<sfile>")
-    finish
-endif
 
 """ Utilities for dealing with visual-mode selection
 function! s:selected() range
@@ -855,7 +852,7 @@ function! incpy#SetupPythonInterpreter(package)
         pythonx __import__('gevent')
     elseif g:incpy#Program != "" && !has("terminal")
         " Otherwise we only need to warn the user that they should use it if they're trying to run an external program
-        echohl WarningMsg | echomsg "WARNING:incpy.vim:Using vim-incpy to run an external program without support for greenlets will be unstable" | echohl None
+        echohl WarningMsg | echomsg printf('WARNING:%s:Using plugin to run an external program without support for greenlets could be unstable', g:incpy#PluginName) | echohl None
     endif
 endfunction
 
@@ -925,4 +922,12 @@ function! incpy#LoadPlugin()
     endif
 endfunction
 
-call incpy#LoadPlugin()
+" Now we can attempt to load the plugin...if python is available.
+if has("python") || has("python3")
+    call incpy#LoadPlugin()
+
+" Otherwise we need to complain about the lack of python.
+else
+    call incpy#SetupOptions()
+    echohl ErrorMsg | echomsg printf("ERROR:%s:Vim compiled without +python support. Unable to initialize plugin from %s", g:incpy#PluginName, expand("<sfile>")) | echohl None
+endif
