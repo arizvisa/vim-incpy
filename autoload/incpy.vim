@@ -440,6 +440,10 @@ function! incpy#EvaluateBlock() range
     return incpy#Evaluate(join(s:selected_block()))
 endfunction
 
+function! incpy#EvaluateSelected() range
+    return incpy#Evaluate(join(s:selected()))
+endfunction
+
 function! incpy#Halp(expr)
     let LetMeSeeYouStripped = substitute(a:expr, '^[ \t\n]\+\|[ \t\n]\+$', '', 'g')
 
