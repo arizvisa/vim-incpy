@@ -921,10 +921,9 @@ endfunction
 
 " Check to see if a python site-user dotfile exists in the users home-directory.
 function! incpy#ImportDotfile()
-    let dotfile = g:incpy#PythonStartup
-    if filereadable(dotfile)
-        let open_and_execute = printf("with open(%s) as infile: exec(infile.read())", s:quote_double(dotfile))
-        call s:execute_interpreter_cache('communicate', [s:quote_single(open_and_execute), 'silent=True'])
+    let l:dotfile = g:incpy#PythonStartup
+    if filereadable(l:dotfile)
+        call incpy#ExecuteFile(l:dotfile)
     endif
 endfunction
 
