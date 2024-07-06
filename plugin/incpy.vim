@@ -79,6 +79,7 @@
 " dict   g:incpy#WindowOptions  -- the options to use when creating the output window.
 " bool   g:incpy#WindowPreview  -- whether to use preview windows for the program output.
 " float  g:incpy#WindowRatio    -- the ratio of the window size when creating it
+" bool   g:incpy#WindowStartup  -- show the window as soon as the plugin is started.
 " string g:incpy#WindowPosition -- the position at which to create the window. can be
 "                                  either "above", "below", "left", or "right".
 " string g:incpy#PythonStartup  -- the name of the dotfile to seed python's globals with.
@@ -633,9 +634,8 @@ function! s:generate_interpreter_view_snippet(package)
         # grab the cached interpreter out of the package
         cache = package.cache
 
-        # create its window and store its buffer id
+        # now we just need to store its buffer id
         interface.vim.gvars['incpy#BufferId'] = cache.view.buffer.number
-        cache.view.create(interface.vim.gvars['incpy#WindowPosition'], interface.vim.gvars['incpy#WindowRatio'])
     EOC
 
     return printf(join(create_view, "\n"), s:quote_single(a:package))
@@ -670,16 +670,16 @@ endfunction
 
 function! incpy#Show()
     let parameters = map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)')
-    call s:execute_interpreter_cache(['view', 'show'], parameters)
+    call s:execute_interpreter_cache_guarded(['view', 'show'], parameters)
 endfunction
 
 function! incpy#Hide()
-    call s:execute_interpreter_cache(['view', 'hide'], [])
+    call s:execute_interpreter_cache_guarded(['view', 'hide'], [])
 endfunction
 
 """ Plugin interaction interface
 function! incpy#Execute(line)
-    call s:execute_interpreter_cache(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
+    call s:execute_interpreter_cache_guarded(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
 
     call s:execute_interpreter_cache('communicate', [s:quote_single(a:line)])
     if g:incpy#OutputFollow
@@ -699,7 +699,7 @@ function! incpy#Range(begin, end)
 
     " Strip our input prior to its execution.
     let code_stripped = s:strip_by_option(g:incpy#ExecStrip, input_stripped)
-    call s:execute_interpreter_cache(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
+    call s:execute_interpreter_cache_guarded(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
 
     " If it's not a list or a string, then we don't support it.
     if !(type(code_stripped) == v:t_string || type(code_stripped) == v:t_list)
@@ -722,7 +722,7 @@ function! incpy#Evaluate(expr)
     let stripped = s:strip_by_option(g:incpy#EvalStrip, a:expr)
 
     " Evaluate and emit an expression in the target using the plugin
-    call s:execute_interpreter_cache(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
+    call s:execute_interpreter_cache_guarded(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
     call s:communicate_interpreter_encoded(s:singleline(g:incpy#EvalFormat, "\"\\"), stripped)
 
     if g:incpy#OutputFollow
@@ -744,7 +744,7 @@ function! incpy#Halp(expr)
 
     " Execute g:incpy#HelpFormat in the target using the plugin's cached communicator
     if len(LetMeSeeYouStripped) > 0
-        call s:execute_interpreter_cache(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
+        call s:execute_interpreter_cache_guarded(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
         call s:communicate_interpreter_encoded(s:singleline(g:incpy#HelpFormat, "\"\\"), s:escape_double(LetMeSeeYouStripped))
     endif
 endfunction
@@ -798,6 +798,7 @@ function! incpy#SetupOptions()
     let defopts["WindowOptions"] = {}
     let defopts["WindowPreview"] = v:false
     let defopts["WindowFixed"] = 0
+    let defopts["WindowStartup"] = v:true
 
     let defopts["Greenlets"] = v:false
     let defopts["Terminal"] = has('terminal')
@@ -864,6 +865,9 @@ function! incpy#SetupPythonInterpreter(package)
     " Now we can setup the interpreter and its view.
     call incpy#SetupInterpreter(a:package)
     call incpy#SetupInterpreterView(a:package)
+
+    """ Set any of the specified options for the interpreter interface.
+    if g:incpy#WindowStartup | call incpy#Show() | endif
 
 endfunction
 
