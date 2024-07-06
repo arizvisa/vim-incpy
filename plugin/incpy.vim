@@ -111,6 +111,7 @@ endif
 let g:loaded_incpy = v:true
 
 """ Utilities for dealing with visual-mode selection
+
 function! s:selected() range
     " really, vim? really??
     let oldvalue = getreg("")
@@ -216,8 +217,9 @@ function! s:windowtail(bufid)
 endfunction
 
 """ Utility functions for indentation, stripping, string processing, etc.
+
+" count the whitespace that prefixes a single-line string
 function! s:count_indent(string)
-    " count the whitespace that prefixes a single-line string
     let characters = 0
     for c in split(a:string, '\zs')
         if stridx(" \t", c) == -1
@@ -228,10 +230,11 @@ function! s:count_indent(string)
     return characters
 endfunction
 
+" find the smallest common indent of a list of strings
 function! s:find_common_indent(lines)
-    " find the smallest common indent of a list of strings
     let smallestindent = -1
     for l in a:lines
+
         " skip lines that are all whitespace
         if strlen(l) == 0 || l =~ '^\s\+$'
             continue
@@ -245,9 +248,8 @@ function! s:find_common_indent(lines)
     return smallestindent
 endfunction
 
+" strip the specified number of characters from a list of lines
 function! s:strip_common_indent(lines, size)
-    " strip the specified number of characters from a list of lines
-
     let results = []
     let prevlength = 0
 
@@ -375,8 +377,8 @@ function! s:quote_double(string)
     return printf("\"%s\"", escape(a:string, '"\'))
 endfunction
 
+" escape the multiline string with the specified characters and return it as a single-line string
 function! s:singleline(string, escape)
-    " escape the multiline string with the specified characters and return it as a single-line string
     let escaped = escape(a:string, a:escape)
     let result = substitute(escaped, "\n", "\\\\n", "g")
     return result
@@ -642,8 +644,9 @@ function! s:generate_interpreter_view_snippet(package)
 endfunction
 
 """ Public interface and management
+
+" Check to see if a python site-user dotfile exists in the users home-directory.
 function! incpy#ImportDotfile()
-    " Check to see if a python site-user dotfile exists in the users home-directory.
     let dotfile = g:incpy#PythonStartup
     if filereadable(dotfile)
         let open_and_execute = printf("with open(%s) as infile: exec(infile.read())", s:quote_double(dotfile))
@@ -651,18 +654,18 @@ function! incpy#ImportDotfile()
     endif
 endfunction
 
+" Start the target program and attach it to a buffer
 function! incpy#Start()
-    " Start the target program and attach it to a buffer
     call s:execute_interpreter_cache('start', [])
 endfunction
 
+" Stop the target program and detach it from its buffer
 function! incpy#Stop()
-    " Stop the target program and detach it from its buffer
     call s:execute_interpreter_cache('stop', [])
 endfunction
 
+" Restart the target program by stopping and starting it
 function! incpy#Restart()
-    " Restart the target program by stopping and starting it
     for method in ['stop', 'start']
         call s:execute_interpreter_cache(method, [])
     endfor
@@ -687,8 +690,8 @@ function! incpy#Execute(line)
     endif
 endfunction
 
+" Execute the specified lines within the current interpreter.
 function! incpy#Range(begin, end)
-    " Execute the specified lines in the target
     let lines = getline(a:begin, a:end)
     let input_stripped = s:strip_by_option(g:incpy#InputStrip, lines)
 
@@ -739,7 +742,6 @@ function! incpy#EvaluateBlock() range
 endfunction
 
 function! incpy#Halp(expr)
-    " Remove all encompassing whitespace from expression
     let LetMeSeeYouStripped = substitute(a:expr, '^[ \t\n]\+\|[ \t\n]\+$', '', 'g')
 
     " Execute g:incpy#HelpFormat in the target using the plugin's cached communicator
@@ -835,8 +837,8 @@ function! incpy#SetupOptions()
     endfor
 endfunction
 
+" Add a virtual package with the specified name referencing the given path.
 function! incpy#SetupPythonLoader(package, currentscriptpath)
-    " Set up the module search path to include the script's "python" directory
     let l:slashes = substitute(a:currentscriptpath, "\\", "/", "g")
 
     " Look up from our current script's directory for a python sub-directory
@@ -871,9 +873,10 @@ function! incpy#SetupPythonInterpreter(package)
 
 endfunction
 
-"" Mapping of vim commands and keys
+""" Mapping of vim commands and keys
+
+" Create some vim commands that can interact with the plugin
 function! incpy#SetupCommands()
-    " Create some vim commands that interact with the plugin
     command PyLine call incpy#Range(line("."), line("."))
     command PyBuffer call incpy#Range(0, line('$'))
 
@@ -888,8 +891,10 @@ function! incpy#SetupCommands()
     command -range PyHelpSelection <line1>,<line2>call incpy#HalpSelected()
 endfunction
 
+" Set up the default key mappings for vim to use the plugin
 function! incpy#SetupKeys()
-    " Set up the default key mappings for vim to use the plugin
+
+    " Execute a single or range of lines
     nnoremap ! :PyLine<C-M>
     vnoremap ! :PyRange<C-M>
 
@@ -919,7 +924,8 @@ function! incpy#LoadPlugin()
     call incpy#SetupCommands()
     call incpy#SetupKeys()
 
-    " if we're using an external program, then there's no dotfile we need to seed with.
+    " if we're using an external program, then we can just ignore the dotfile
+    " since it really only makes sense when using the python interpreter.
     if g:incpy#Program == ""
         call incpy#ImportDotfile()
     endif
