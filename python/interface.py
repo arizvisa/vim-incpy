@@ -337,12 +337,22 @@ else:
                 return window if window > 0 else cls.create(bufferid, position, ratio, options, preview=preview)
 
             @classmethod
-            def hide(cls, bufferid, preview=False):
+            def hide(cls, bufferid):
                 last = cls.select(cls.buffer(bufferid))
-                if preview:
+                res = vim.window.type(vim.buffer.window(bufferid))
+
+                # If it's a "preview" window, then use the right command to close it.
+                if res == 'preview':
                     vim.command("noautocmd silent pclose!")
-                else:
+
+                # Otherwise, treat it like a normal window to close.
+                elif res:
                     vim.command("noautocmd silent close!")
+
+                # FIXME: should probably raise an exception or log something
+                #        if we can't find the window that needs to be closed.
+                else:
+                    pass
                 return cls.select(last)
 
             # window state
@@ -615,7 +625,7 @@ class view(object):
         if vim.buffer.window(bufobj.number) == -1:
             raise Exception("Window for {:d} is already hidden".format(bufobj.number))
 
-        return vim.window.hide(bufobj.number, preview=self.preview)
+        return vim.window.hide(bufobj.number)
 
     def __repr__(self):
         cls, name = self.__class__, self.buffer.name
