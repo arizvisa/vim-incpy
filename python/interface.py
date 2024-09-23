@@ -287,27 +287,28 @@ else:
 
             # window actions
             @classmethod
-            def create(cls, bufferid, position, ratio, options, preview=False):
+            def create(cls, bufferid, position, ratio, options):
                 '''create a window for the bufferid and return its number'''
-                last = cls.current()
+                last, mutable_options = cls.current(), options.copy()
 
+                preview = mutable_options.pop('preview', False)
                 size = cls.currentsize(position) * ratio
                 if preview:
-                    if len(options) > 0:
-                        vim.command("noautocmd silent {:s} pedit! +setlocal\\ {:s} {:s}".format(cls.positionToLocation(position), cls.optionsToCommandLine(options), vim.buffer.name(bufferid)))
+                    if len(mutable_options) > 0:
+                        vim.command("noautocmd silent {:s} pedit! +setlocal\\ {:s} {:s}".format(cls.positionToLocation(position), cls.optionsToCommandLine(mutable_options), vim.buffer.name(bufferid)))
                     else:
                         vim.command("noautocmd silent {:s} pedit! {:s}".format(cls.positionToLocation(position), vim.buffer.name(bufferid)))
                     vim.command("noautocmd silent! wincmd P")
                 else:
-                    if len(options) > 0:
-                        vim.command("noautocmd silent {:s} {:d}{:s}! +setlocal\\ {:s} {:s}".format(cls.positionToLocation(position), int(size), cls.positionToSplit(position), cls.optionsToCommandLine(options), vim.buffer.name(bufferid)))
+                    if len(mutable_options) > 0:
+                        vim.command("noautocmd silent {:s} {:d}{:s}! +setlocal\\ {:s} {:s}".format(cls.positionToLocation(position), int(size), cls.positionToSplit(position), cls.optionsToCommandLine(mutable_options), vim.buffer.name(bufferid)))
                     else:
                         vim.command("noautocmd silent {:s} {:d}{:s}! {:s}".format(cls.positionToLocation(position), int(size), cls.positionToSplit(position), vim.buffer.name(bufferid)))
 
                 # grab the newly created window
                 new = cls.current()
                 try:
-                    if bool(vim.gvars['incpy#WindowPreview']):
+                    if preview:
                         return new
 
                     newbufferid = cls.buffer(new)
@@ -328,13 +329,13 @@ else:
                 return new
 
             @classmethod
-            def show(cls, bufferid, position, ratio, options, preview=False):
+            def show(cls, bufferid, position, ratio, options):
                 '''return the window for the bufferid, recreating it if its now showing'''
                 window = cls.available(bufferid)
 
                 # if we already have a windowid for the buffer, then we can return it. otherwise
                 # we rec-reate the window which should get the buffer to work.
-                return window if window > 0 else cls.create(bufferid, position, ratio, options, preview=preview)
+                return window if window > 0 else cls.create(bufferid, position, ratio, options)
 
             @classmethod
             def hide(cls, bufferid):
@@ -516,7 +517,7 @@ class view(object):
         Buffer can be an existing buffer, an id number, filename, or even a new name.
         """
         self.options = opt
-        self.preview = preview
+        self.options['preview'] = preview
 
         # Get the vim.buffer from the buffer the caller gave us.
         try:
@@ -596,7 +597,7 @@ class view(object):
             raise Exception("Specified ratio is out of bounds {!r}".format(ratio))
 
         # create the window, get its buffer, and update our state with it.
-        window = vim.window.create(bufobj.number, position, ratio, self.options, preview=self.preview)
+        window = vim.window.create(bufobj.number, position, ratio, self.options)
         self.buffer = vim.eval("winbufnr({:d})".format(window))
         return window
 
@@ -611,8 +612,8 @@ class view(object):
         # if vim.buffer.window(bufobj.number) != -1:
         #    raise Exception("Window for {:d} is already showing".format(bufobj.number))
 
-        window = vim.window.show(bufobj.number, position, ratio, self.options, preview=self.preview)
-        self.buffer = vim.eval("winbufnr({:d})".format(window))
+        window = vim.window.show(bufobj.number, position, ratio, self.options)
+        self.buffer = vim.window.buffer(window)
         return window
 
     def hide(self):
@@ -631,6 +632,5 @@ class view(object):
         cls, name = self.__class__, self.buffer.name
         descr = "{:d}".format(name) if isinstance(name, integer_types) else "\"{:s}\"".format(name)
         identity = descr if buffer.exists(self.__buffer_name) else "(missing) {:s}".format(descr)
-        if self.preview:
-            return "<{:s} buffer:{:d} {:s} preview>".format('.'.join([__name__, cls.__name__]), self.window, identity)
-        return "<{:s} buffer:{:d} {:s}>".format('.'.join([__name__, cls.__name__]), self.window, identity)
+        window_type = vim.window.type(self.window)
+        return "<{:s} buffer:{:d} {:s}{:s}>".format('.'.join([__name__, cls.__name__]), self.window, identity, " {:s}".format(window_type) if window_type else '')
