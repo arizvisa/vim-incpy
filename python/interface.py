@@ -275,6 +275,11 @@ else:
                 '''Return the bufferid for the specified window'''
                 return int(vim.eval("winbufnr({:d})".format(window)))
 
+            @classmethod
+            def type(cls, window):
+                res = vim.eval("win_gettype({:d})".format(window))
+                return None if res == 'unknown' else res
+
             @staticmethod
             def available(bufferid):
                 '''Return the first window number for a buffer id'''
