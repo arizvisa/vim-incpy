@@ -353,8 +353,8 @@ function! s:generate_interpreter_cache_snippet(package)
 
         # if we couldn't start the interpreter, then fall back to an internal one
         except Exception:
-            logger.fatal("error starting external interpreter: {:s}".format(program), exc_info=True)
-            logger.warning("falling back to internal python interpreter")
+            hasattr(package, 'logger') and package.logger.fatal("error starting external interpreter: {:s}".format(program), exc_info=True)
+            hasattr(package, 'logger') and package.logger.warning("falling back to internal python interpreter")
             cache = interpreters.python_internal.new(opt=opt)
 
         # assign the interpreter object into our package
