@@ -181,6 +181,45 @@ function! s:singleline(string, escape)
     return result
 endfunction
 
+" convert from a vim native type to a string that can be interpreted by python
+function! s:render_native_as_python(object)
+    let object_type = type(a:object)
+    if object_type == v:t_number
+        return printf('%d', a:object)
+    elseif object_type == v:t_string
+        return s:quote_single(a:object)
+    elseif object_type == v:t_none
+        return 'None'
+    elseif object_type == v:t_float
+        return printf('%f', a:object)
+    elseif object_type == v:t_bool
+        return a:object? 'True' : 'False'
+    elseif object_type == v:t_blob
+        let items = []
+        for by in a:object
+            let items += [printf("%#04x", by)]
+        endfor
+        return printf('bytearray([%s])', join(items, ','))
+    else
+        throw printf("Unable to render the specified type (%d): %s", object_type, object)
+    endif
+endfunction
+
+" convert from a vim type (container or native) to a string that can be interpreted by python
+function! s:render_as_python(object)
+    let object_type = type(a:object)
+    if object_type == v:t_list
+        let items = map(a:object, 's:render_as_python(v:val)')
+        return printf('[%s]', join(items, ','))
+    elseif object_type == v:t_dict
+        let rendered = map(a:object, 'printf("%s:%s", s:render_as_python(v:key), s:render_as_python(v:val))')
+        let items = map(keys(rendered), 'get(rendered, v:val)')
+        return printf('{%s}', join(items, ','))
+    else
+        return s:render_native_as_python(a:object)
+    endif
+endfunction
+
 """ Utilities related to executing python
 function! s:execute_python_in_workspace(package, command)
     let l:multiline_command = split(a:command, "\n")
