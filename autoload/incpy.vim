@@ -201,7 +201,7 @@ function! s:render_native_as_python(object)
         endfor
         return printf('bytearray([%s])', join(items, ','))
     else
-        throw printf("Unable to render the specified type (%d): %s", object_type, object)
+        throw printf("Unable to render the specified type (%d): %s", object_type, a:object)
     endif
 endfunction
 
