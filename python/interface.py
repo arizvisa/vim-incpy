@@ -150,6 +150,7 @@ else:
         # buffer/window
         buffers = _accessor(_vim.buffers)
         current = _accessor(_vim.current)
+        tabpages = _accessor(_vim.tabpages)
 
         # vim.command and evaluation (local + remote)
         if (_vim.eval('has("clientserver")')) and False:
