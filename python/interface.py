@@ -786,8 +786,14 @@ class multiview(object):
     del(encoding_descriptor)
 
     def __init__(self, bufferobj):
-        self.buffer = buffer = newbuffer.new(bufferobj)
+        self.__buffer__ = buffer = newbuffer.new(bufferobj)
         self.windows = vim.newbuffer.windows(buffer.number)
+
+    @property
+    def buffer(self):
+        if self.__buffer__ is not None:
+            return self.__buffer__
+        raise vim.error('Unable to access buffer for managing windows due to the buffer having been closed.')
 
     @classmethod
     def __create_window_options(cls, options):
