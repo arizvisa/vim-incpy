@@ -23,12 +23,12 @@ class interpreter(object):
         return cls(*args, **options)
 
     def __init__(self, **kwds):
-        opt = {}.__class__(vim.gvars['incpy#CoreWindowOptions'])
-        opt.update(vim.gvars['incpy#WindowOptions'])
-        opt.update(kwds.pop('opt', {}))
+        core = {}.__class__(vim.gvars['incpy#CoreWindowOptions'])
+        core.update(vim.gvars['incpy#WindowOptions'])
+        core.update(kwds.pop('opt', {}))
         kwds.setdefault('preview', vim.gvars['incpy#WindowPreview'])
         kwds.setdefault('tab', vim.tab.getCurrent())
-        self.view = interface.view(kwds.pop('buffer', None) or vim.gvars['incpy#WindowName'], opt, **kwds)
+        self.view = interface.view(kwds.pop('buffer', None) or vim.gvars['incpy#WindowName'], core, **kwds)
 
     def write(self, data):
         """Writes data directly into view"""
@@ -201,11 +201,13 @@ class terminal(external):
         self.__options.update(dict)
 
     def __init__(self, **kwds):
-        self.__options = {'hidden': True}
-        opt = {}.__class__(vim.gvars['incpy#CoreWindowOptions'])
-        opt.update(vim.gvars['incpy#WindowOptions'])
-        opt.update(kwds.pop('opt', {}))
-        self.__options.update(opt)
+        core = {}.__class__(vim.gvars['incpy#CoreWindowOptions'])
+        core.update(vim.gvars['incpy#WindowOptions'])
+        core.update(kwds.pop('opt', {}))
+
+        options = {'hidden': True}
+        options.update(core)
+        self.__options = options
 
         kwds.setdefault('preview', vim.gvars['incpy#WindowPreview'])
         kwds.setdefault('tab', vim.tab.getCurrent())
