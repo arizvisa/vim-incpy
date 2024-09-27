@@ -962,6 +962,63 @@ class multiview(object):
         logger.debug("Unable to determine ownership of the currently showing windows ({:s}).".format(', '.join(map("{:d}".format, sorted(windows)))))
         return -1
 
+    def close(self):
+        last, number = vim.newwindow.current(), self.buffer.number
+        tab, windows = vim.newtab.current(), vim.newbuffer.windows(number)
+
+        # Convert the window ids to a snapshot of each id keyed by the tab and window number.
+        window_locations = {window: vim.newwindow.tab_and_number(window) for window in windows}
+
+        # Now we'll extract the tab number into a list, and remove the
+        # current tab from it so that we can close those windows last.
+        tabs = {}
+        for window, (wtab, wnumber) in window_locations.items():
+            tabs.setdefault(wtab, []).append(window)
+        tabs = {wtab : {window for window in windows} for wtab, windows in tabs.items()}
+
+        # Next we'll need to use our current tab to remove
+        # the associated windows from our tab dictionary.
+        current, others, available = {tab: tabs.pop(tab)}, tabs, windows
+
+        # Now we'll build the command that we'll execute in each tab
+        # that we'll use to close all windows that opened our buffer.
+        tabpage_comparison = "tabpagenr() != {:d}".format(*current)
+        buffer_comparison = "bufnr() == {:d}".format(number)
+        preview_check_command = "win_gettype(winnr()) == \"{:s}\"".format('preview')
+        prefix_command = 'noautocmd silent'
+        close_window_command = "execute printf(\"{:s} %sclose!\", ({:s})? \"{:s}\" : \"{:s}\")".format(prefix_command, preview_check_command, 'p', '')
+
+        # Finally we can traverse through all of the other tabs and close all windows
+        # associated with our buffer. We repeat the process for the current tab too.
+        conditional = "if {:s} | {:s} | endif".format(buffer_comparison, close_window_command)
+        do_window_command = "windo {:s}".format(conditional)
+        [ vim.command("{:d}tabdo {:s}".format(otab, do_window_command)) for otab in sorted(others)[::-1] ]
+        [ vim.command(do_window_command) for otab in current ]
+
+        # That should've closed absolutely everything. For sanity, though we
+        # go ahead and verify that we've closed all references to the buffer.
+        everything = itertools.chain(others.items(), current.items())
+        iterable = itertools.chain(*(windows for _, windows in everything))
+        known, closed = self.windows, {window for window in iterable}
+
+        unmanaged = closed - known
+        unmanaged_description = map("{:d}".format, unmanaged)
+        logger.debug("Closed {:d} windows associated with buffer ({:d}) of which {:d} window{:s} were not managed by us ({:s}).".format(len(closed), number, len(unmanaged), '' if len(unmanaged) == 1 else 's', ','.join(unmanaged_description)))
+
+        # If there are still any windows open, then bail and raise an exception.
+        remaining = vim.newbuffer.windows(number)
+        if len(remaining) > 0:
+            raise vim.error("Unable to close {:d} window{:s} ({:s}) associated with buffer ({:d}).".format(len(remaining), '' if len(remaining) == 1 else 's', ','.join(map("{:d}".format, remaining)), number))
+
+        # Now that we know that there's no windows open to our buffer,
+        # we can close the buffer and be done with this class forever.
+        try:
+            self.buffer.close()
+        finally:
+            buffer, self.__buffer__ = self.__buffer__, None
+            vim.newwindow.select(last) if vim.newwindow.exists(last) else last
+        return
+
     # forward everything that makes this look like a file to the buffer.
     write = property(fget=lambda self: self.buffer.write)
     writable = property(fget=lambda self: self.buffer.writable)
