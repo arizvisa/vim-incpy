@@ -77,9 +77,23 @@ else:
                 del self.__backing__[rname]
 
         class _accessor(object):
-            def __init__(self, result): self.result = result
-            def __get__(self, obj, objtype): return self.result
-            def __set__(self, obj, val): self.result = val
+            def __init__(self, *result, **callables):
+                if result:
+                    self._slot = []
+                    self._get = (lambda slot: lambda: slot[0])(self._slot)
+                    self._set = (lambda slot: lambda value: [slot.clear(), slot.append(value)])(self._slot)
+                    self._slot.append(*result)
+                else:
+                    self._get, self._set = callables.get('get'), callables.get('set')
+                return
+            def __get__(self, obj, objtype=None):
+                if callable(self._get):
+                    return self._get()
+                raise AttributeError('unreadable attribute')
+            def __set__(self, obj, val):
+                if callable(self._set):
+                    return self._set(val)
+                raise AttributeError('can\'t set attribute')
 
         class _vars(object):
             def __new__(cls, prefix="", name=None):
