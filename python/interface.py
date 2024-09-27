@@ -570,6 +570,8 @@ else:
         dimensions = _accessor(get=lambda: tuple(int(vim.eval('&' + option)) for option in ['columns', 'lines']))
         width = _accessor(get=lambda: int(vim.eval('&columns')))
         height = _accessor(get=lambda: int(vim.eval('&lines')))
+        available_buffers = _accessor(get=lambda: {int(info['bufnr']) for info in vim.eval('getbufinfo()')})
+        available_windows = _accessor(get=lambda: {int(info['winid']) for info in vim.eval('getwininfo()')})
 
         @classmethod
         def size(cls, position):
