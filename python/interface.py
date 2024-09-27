@@ -568,6 +568,48 @@ else:
                 identifiers = itertools.chain(*(info['windows'] for info in filtered))
                 return {int(windowid) for windowid in identifiers}
 
+        class terminal(object):
+            """Internal vim commands for interacting with terminal jobs by their buffer number"""
+            exists = staticmethod(lambda buffer: len(vim.eval("term_getsize({:d})".format(buffer))) > 0)
+
+            @classmethod
+            def start(cls, cmd, **options):
+                '''Start the specified command as a terminal job and return the buffer number.'''
+                return vim.Function('term_start')(cmd, vim.Dictionary(options))
+
+            @classmethod
+            def stop(cls, buffer):
+                '''Stop the terminal job running in the specified buffer.'''
+                if not cls.exists(buffer):
+                    raise vim.error("Unable to stop the job in buffer {:d} as it is not associated with a job.".format(buffer))
+                return vim.eval("job_stop(term_getjob({:d}))".format(buffer))
+
+            @classmethod
+            def info(cls, buffer):
+                '''Return information for the terminal job in the specified buffer as a dictionary.'''
+                if not cls.exists(buffer):
+                    raise vim.error("Unable to get information for job in buffer {:d} as it is not associated with a job.".format(buffer))
+                return vim.eval("job_info(term_getjob({:d}))".format(buffer))
+
+            @classmethod
+            def status(cls, buffer):
+                '''Return the status for the terminal job in the specified buffer as a string.'''
+                if not cls.exists(buffer):
+                    raise vim.error("Unable to get the status for job in buffer {:d} as it is not associated with a job.".format(buffer))
+                return vim.eval("term_getstatus({:d})".format(buffer))
+
+            @classmethod
+            def send(cls, buffer, keys):
+                '''Send the given keystrokes to the terminal job in the specified buffer.'''
+                return vim.Function('term_sendkeys')(buffer, keys)
+
+            @classmethod
+            def wait(cls, buffer, *timeout):
+                '''Wait for any pending updates to the terminal job in the specified buffer.'''
+                if not cls.exists(buffer):
+                    raise vim.error("Unable to wait on the terminal job in buffer {:d} as it is not associated with a job.".format(buffer))
+                return vim.Function('term_wait')(buffer, *timeout)
+
         dimensions = _accessor(get=lambda: tuple(int(vim.eval('&' + option)) for option in ['columns', 'lines']))
         width = _accessor(get=lambda: int(vim.eval('&columns')))
         height = _accessor(get=lambda: int(vim.eval('&lines')))
