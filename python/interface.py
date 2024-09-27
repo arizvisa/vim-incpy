@@ -1,4 +1,4 @@
-import sys, functools, codecs
+import sys, functools, codecs, operator, itertools
 from . import integer_types, string_types, logger
 
 logger = logger.getChild(__name__)
@@ -215,6 +215,11 @@ else:
             new = staticmethod(lambda name: buffer.new(name))
             of = staticmethod(lambda id: buffer.of(id))
 
+            # utilities for finding a window using its buffer id
+            window_id = staticmethod(lambda bufnum: int(vim.eval("bufwinid({:d})".format(bufnum))))
+            window_ids = staticmethod(lambda bufnum: [wid for wid in map(int, vim.eval("win_findbuf({:d})".format(bufnum)))])
+            windows = classmethod(lambda bufnum: [int(vim.eval("win_id2win({:d})".format(wid))) for wid in cls.window_ids(bufnum)])
+
         class window(object):
             """Internal vim commands for doing things with a window"""
 
@@ -382,6 +387,161 @@ else:
             def restsize(cls, bufferid, state):
                 window = cls.buffer(bufferid)
                 return "vertical {:d} resize {:d} | {:d} resize {:d}".format(window, state['width'], window, state['height'])
+
+        class newbuffer(object):
+            """Internal vim commands for getting information about a buffer"""
+            name = staticmethod(lambda number: str(vim.eval("bufname({!s})".format(number))))
+            exists = staticmethod(lambda number: bool(vim.eval("bufexists({!s})".format(number))))
+            count = staticmethod(lambda *attribute: sum(1 for info in filter(operator.itemgetter(*attribute) if attribute else None, vim.eval('getbufinfo()'))))
+            available = staticmethod(lambda *attribute: {info['bufnr'] for info in filter(operator.itemgetter(*attribute) if attribute else None, vim.eval('getbufinfo()'))})
+
+            # utilities for finding a window using its buffer id
+            @classmethod
+            def windows(cls, number):
+                '''Return the list of window ids for the specified buffer number.'''
+                res = vim.eval("getbufinfo({:d})".format(number))
+                iterable = itertools.chain(*(info['windows'] for info in res))
+                return {id for id in map(int, iterable)}
+
+            # managing the scope of a buffer
+            @classmethod
+            def new(cls, name):
+                '''Add a new buffer with the specified name and return its buffer number.'''
+                vim.command("silent! badd {:s}".format(name))
+                return cls.of(name)
+
+            @classmethod
+            def close(cls, number):
+                '''Delete and unload the specified buffer from the buffer list.'''
+                # if vim is going down, then it will crash trying to do anything
+                # with python...so, don't even attempt to delete the buffer.
+                if vim.vvars['dying']:
+                    return
+                vim.command("silent! bdelete! {:d}".format(number))
+
+            @classmethod
+            def by(cls, number):
+                '''Return the `vim.Buffer` object for the specified buffer number.'''
+                iterable = (buffer for buffer in vim.buffers)
+                filtered = (buffer for buffer in iterable if buffer.number == number)
+                result = next(filtered, None)
+                if result is None:
+                    raise vim.error("Unable to find buffer from number ({!s})".format(number))
+                return result
+
+            @classmethod
+            def of(cls, identity):
+                '''Return the buffer number for the specified name, number, or buffer.'''
+                if isinstance(identity, _vim.Buffer):
+                    return identity.number
+
+                # Grab the info using identity as a buffer number.
+                elif isinstance(identity, integer_types):
+                    infos = vim.eval("getbufinfo({:d})".format(identity))
+
+                # Grab the info using identity as a buffer name.
+                elif isinstance(identity, string_types):
+                    escaped = identity.replace("'", "''")
+                    infos = vim.eval("getbufinfo('{:s}')".format(escaped))
+
+                # We don't support any other types...
+                else:
+                    raise vim.error("Unable to determine buffer from parameter type : {!s}".format(identity))
+
+                # Extract our results from the buffer info that we queried.
+                results = {int(info['bufnr']) for info in infos}
+                if len(results) != 1:
+                    raise vim.error("Unable to find buffer from parameter : {!s}".format(identity))
+                [number] = results
+
+                # Verify that the buffer actually exists before returning it.
+                if not cls.exists(number):
+                    raise vim.error("Unable to find buffer from parameter : {!s}".format(identity))
+                return number
+
+        class newwindow(object):
+            exists = staticmethod(lambda window: -1 < int(vim.eval("winbufnr({!s})".format(window))))
+
+            @classmethod
+            def number(cls, windowid):
+                '''Return the window number for the window with the specified id.'''
+                res = vim.eval("win_id2win({:d})".format(windowid))
+                return int(res)
+
+            @classmethod
+            def count(cls, *tab):
+                '''Return the number of windows for the specified tab or all available tabs.'''
+                iterable = (selected or int(vim.eval('tabpagenr()')) for selected in tab)
+                formatted = (integer for integer in map("{:d}".format, iterable))
+                tabinfo = vim.eval("gettabinfo({:s})".format(next(formatted, '')), *formatted)
+                iterable = (info['windows'] for info in tabinfo)
+                return sum(map(len, iterable))
+
+            @classmethod
+            def buffer(cls, windowid):
+                '''Return the buffer number for the window with the specified id.'''
+                iterable = (info for info in vim.eval("getwininfo({:d})".format(windowid)))
+                numbers = {int(info['bufnr']) for info in iterable}
+                if len(numbers) != 1:
+                    raise vim.error("Unable to get the buffer number for the specified id ({:d})".format(windowid))
+                [number] = numbers
+                return number
+
+            @classmethod
+            def tab_and_number(cls, windowid):
+                '''Return the tab and window number for the window with the specified id.'''
+                [tab, number] = map(int, vim.eval("win_id2tabwin({:d})".format(windowid)))
+                return tab, number
+
+            @classmethod
+            def tab(cls, windowid):
+                '''Return the tab number for the window with the specified id.'''
+                tab, _ = cls.tab_and_number(windowid)
+                return tab
+
+            @classmethod
+            def select(cls, windowid):
+                '''Select the window with the specified window id.'''
+                ok = int(vim.eval("win_gotoid({:d})".format(windowid)))
+                return True if ok else False
+
+            @classmethod
+            def current(cls):
+                '''Return the window id for the current window.'''
+                res = vim.eval('win_getid(winnr(), tabpagenr())')
+                return int(res)
+
+            @classmethod
+            def type(cls, windowid):
+                '''Return the type for the window with the specified id as a string.'''
+                res = vim.eval("win_gettype({:d})".format(windowid))
+                return None if res == 'unknown' else res
+
+        class newtab(object):
+            """Internal vim commands for interacting with tabs"""
+            @classmethod
+            def current(cls):
+                '''Return the current tab page number.'''
+                return int(vim.eval('tabpagenr()'))
+
+            @classmethod
+            def count(cls):
+                '''Return the current number of tabs.'''
+                return int(vim.eval("tabpagenr('{:s}')".format('$')))
+
+            @classmethod
+            def buffers(cls, tab):
+                '''Return a list of the buffer numbers for the specified tab.'''
+                iterable = vim.eval("tabpagebuflist({:s})".format("{:d}".format(tab) if tab else '')) or []
+                return {int(number) for number in iterable}
+
+            @classmethod
+            def windows(cls, *tab):
+                '''Return a list of the window ids for the specified tab.'''
+                iterable = (info for info in vim.eval("gettabinfo({:s})".format("{:d}".format(*tab) if tab else '')))
+                filtered = (info for info in iterable if operator.eq(int(info['tabnr']), *tab))
+                identifiers = itertools.chain(*(info['windows'] for info in filtered))
+                return {int(windowid) for windowid in identifiers}
 
 # fd-like wrapper around vim buffer object
 class buffer(object):
