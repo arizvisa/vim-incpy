@@ -531,6 +531,16 @@ else:
                 res = vim.eval("win_gettype({:d})".format(windowid))
                 return None if res == 'unknown' else res
 
+            @classmethod
+            def dimensions(cls, windowid):
+                '''Return the dimensions for the window with the specified id.'''
+                iterable = (info for info in vim.eval("getwininfo({:d})".format(windowid)))
+                dimensions = {(int(info['width']), int(info['height'])) for info in iterable}
+                if len(dimensions) != 1:
+                    raise vim.error("Unable to get window information for the specified id ({:d})".format(windowid))
+                [dimension] = dimensions
+                return dimension
+
         class newtab(object):
             """Internal vim commands for interacting with tabs"""
             @classmethod
@@ -556,6 +566,20 @@ else:
                 filtered = (info for info in iterable if operator.eq(int(info['tabnr']), *tab))
                 identifiers = itertools.chain(*(info['windows'] for info in filtered))
                 return {int(windowid) for windowid in identifiers}
+
+        dimensions = _accessor(get=lambda: tuple(int(vim.eval('&' + option)) for option in ['columns', 'lines']))
+        width = _accessor(get=lambda: int(vim.eval('&columns')))
+        height = _accessor(get=lambda: int(vim.eval('&lines')))
+
+        @classmethod
+        def size(cls, position):
+            '''Return the dimensions of the user interface for the editor.'''
+            columns, lines = cls.dimensions
+            if position in {'left', 'right'}:
+                return columns
+            if position in {'above', 'below'}:
+                return lines
+            raise ValueError(position)
 
 # fd-like wrapper around vim buffer object
 class buffer(object):
