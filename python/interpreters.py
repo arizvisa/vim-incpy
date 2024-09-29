@@ -56,10 +56,10 @@ class interpreter_with_view(interpreter):
 
         buffer_description = "{:d}".format(buffer.number) if buffer else 'missing'
         if self.view and self.view.windows:
-            count = vim.newwindow.count()
+            count = vim.window.count()
             return "<{:s} buffer:{:s} ({:s})>".format('.'.join([getattr(cls, '__module__', __name__), cls.__name__]), buffer_description, "{:d}".format(count) if len(self.view.windows) == count else "{:d}/{:d}".format(len(self.view.windows), count))
 
-        count = len(vim.newbuffer.windows(buffer.number)) if buffer else 0
+        count = len(vim.buffer.windows(buffer.number)) if buffer else 0
         return "<{:s} buffer:{:s} {:s}>".format('.'.join([getattr(cls, '__module__', __name__), cls.__name__]), buffer_description, "({:d})".format(count) if count else 'hidden')
 
     # properties needed by each interpreter.
@@ -90,7 +90,7 @@ class interpreter_with_view(interpreter):
         if isinstance(number_or_name_or_view, integer_types):
             buffer = number_or_name_or_view
         elif isinstance(number_or_name_or_view, string_types):
-            buffer = vim.newbuffer.new(number_or_name_or_view)
+            buffer = vim.buffer.new(number_or_name_or_view)
 
         # if we were given a view as the parameter, then just use it.
         elif isinstance(number_or_name_or_view, interface.multiview):
@@ -140,19 +140,19 @@ class interpreter_with_view(interpreter):
 
         # we hide the largest one first which means we'll need to
         # sort our list of managed windows by their dimensions.
-        Fkey_window_area = lambda window: (lambda width, height: width * height)(*vim.newwindow.dimensions(window))
+        Fkey_window_area = lambda window: (lambda width, height: width * height)(*vim.window.dimensions(window))
         ordered = sorted(ours, key=Fkey_window)
 
         # grab the largest window from our sorted list, and proceed to hide it.
         window = next(reversed(ordered), 0)
-        if window and vim.newwindow.exists(window):
+        if window and vim.window.exists(window):
             return True if self.view.hide(window) > -1 else False
         return False
 
     def available(self, tab=0):
         '''Return a list of the windows for the current interpreter on the specified tab.'''
-        available = vim.newtab.windows(tab if tab else vim.newtab.current())
-        windows = vim.newbuffer.windows(self.buffer)
+        available = vim.tab.windows(tab if tab else vim.tab.current())
+        windows = vim.buffer.windows(self.buffer)
         return [window for window in available & windows]
 
 class newinternal(interpreter_with_view):

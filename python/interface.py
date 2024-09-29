@@ -204,7 +204,7 @@ else:
                 caller.__name__ = name
                 return caller
 
-        class newbuffer(object):
+        class buffer(object):
             """Internal vim commands for getting information about a buffer"""
             name = staticmethod(lambda number: str(vim.eval("bufname({!s})".format(number))))
             exists = staticmethod(lambda number: bool(vim.eval("bufexists({!s})".format(number))))
@@ -275,7 +275,7 @@ else:
                     raise vim.error("Unable to find buffer from parameter : {!s}".format(identity))
                 return number
 
-        class newwindow(object):
+        class window(object):
             exists = staticmethod(lambda window: -1 < int(vim.eval("winbufnr({!s})".format(window))))
 
             @classmethod
@@ -343,7 +343,7 @@ else:
                 [dimension] = dimensions
                 return dimension
 
-        class newtab(object):
+        class tab(object):
             """Internal vim commands for interacting with tabs"""
             @classmethod
             def current(cls):
@@ -427,7 +427,7 @@ else:
                 return lines
             raise ValueError(position)
 
-class newbuffer(object):
+class buffer(object):
     """vim buffer management"""
 
     @classmethod
@@ -435,8 +435,8 @@ class newbuffer(object):
         if isinstance(name_or_number_or_buffer, type(vim.current.buffer)):
             return cls(name_or_number_or_buffer.number)
         elif isinstance(name_or_number_or_buffer, string_types):
-            return cls(vim.newbuffer.new(name_or_number_or_buffer))
-        elif not vim.newbuffer.exists(name_or_number_or_buffer):
+            return cls(vim.buffer.new(name_or_number_or_buffer))
+        elif not vim.buffer.exists(name_or_number_or_buffer):
             raise vim.error("Unable to find buffer from parameter : {!s}".format(name_or_number_or_buffer))
         return cls(name_or_number_or_buffer)
 
@@ -446,7 +446,7 @@ class newbuffer(object):
 
     def close(self):
         res = self.buffer.number
-        return vim.newbuffer.close(res)
+        return vim.buffer.close(res)
 
     def __repr__(self):
         cls = self.__class__
@@ -455,7 +455,7 @@ class newbuffer(object):
     # Properties
     name = property(fget=lambda self: self.buffer.name)
     number = property(fget=lambda self: self.buffer.number)
-    exists = property(fget=lambda self: vim.newbuffer.exists(self.buffer.number))
+    exists = property(fget=lambda self: vim.buffer.exists(self.buffer.number))
 
     # Things that make this look like a file.
     def __get_buffer_index(self):
@@ -514,8 +514,8 @@ class multiview(object):
     del(encoding_descriptor)
 
     def __init__(self, bufferobj):
-        self.__buffer__ = buffer = newbuffer.new(bufferobj)
-        self.windows = vim.newbuffer.windows(buffer.number)
+        self.__buffer__ = res = buffer.new(bufferobj)
+        self.windows = vim.buffer.windows(res.number)
 
     @property
     def buffer(self):
@@ -556,7 +556,7 @@ class multiview(object):
 
     @classmethod
     def __create_window_tab_keyword(cls, tab):
-        count = vim.newtab.count()
+        count = vim.tab.count()
         if isinstance(tab, string_types) and any([tab.startswith('new'), not(tab)]):
             return "{:s}tab".format(tab[3:] or '$') if tab else ''
         elif not isinstance(tab, integer_types):
@@ -568,7 +568,7 @@ class multiview(object):
     @classmethod
     def __create_window(cls, number, position, size, options, tab=0):
         '''create a window for the buffer number and return its window id'''
-        last, mutable_options = vim.newwindow.current(), options.copy()
+        last, mutable_options = vim.window.current(), options.copy()
 
         location = cls.__create_window_location_keyword(position)
         split_type = cls.__create_window_split_keyword(position)
@@ -591,9 +591,9 @@ class multiview(object):
             vim.command("noautocmd silent {:s} edit! {:s}{:s}".format(location_prefix, int(size), setlocal_command, "#{:d}".format(number)))
 
         # grab the newly created window
-        new = vim.newwindow.current()
+        new = vim.window.current()
         try:
-            newnumber = vim.newwindow.buffer(new)
+            newnumber = vim.window.buffer(new)
 
             # if the buffer id for the new window matches the one
             # that we've cached, then we can return the window id.
@@ -601,7 +601,7 @@ class multiview(object):
                 return new
 
             # if the buffer number doesn't exist, then we have to recreate one.
-            if not vim.newbuffer.exists(number):
+            if not vim.buffer.exists(number):
                 raise Exception("The requested buffer ({:d}) does not exist and will need to be created.".format(number))
 
             # if our new buffer number doesn't match the requested one, then we switch to it.
@@ -611,28 +611,28 @@ class multiview(object):
 
         # select the previous window that we saved.
         finally:
-            vim.newwindow.select(last)
+            vim.window.select(last)
         return new
 
     def add(self, tab, position, size, **options):
-        tabnumber = 0 if tab == vim.newtab.current() else tab
+        tabnumber = 0 if tab == vim.tab.current() else tab
         window = self.__create_window(self.buffer.number, position, size, options, tab=tabnumber)
         self.windows.add(window)
         return window
 
     def hide(self, window):
-        last, number = vim.newwindow.current(), self.buffer.number
+        last, number = vim.window.current(), self.buffer.number
 
         # first check the window type so that we can figure
         # out which command we'll need to use to close it.
-        preview = vim.newwindow.type(window) == 'preview'
-        if not preview and not vim.newwindow.exists(window):
+        preview = vim.window.type(window) == 'preview'
+        if not preview and not vim.window.exists(window):
             return self.windows.discard(window) or -1
 
         # figure out whether the window that we're hiding
         # is in the same tab or found in a different one.
-        wtab, wnumber = vim.newwindow.tab_and_number(window)
-        tabnumber = 0 if wtab == vim.newtab.current() else wtab
+        wtab, wnumber = vim.window.tab_and_number(window)
+        tabnumber = 0 if wtab == vim.tab.current() else wtab
         tabdo = "{:d}tabdo".format(wtab) if tabnumber else ''
         windo = "{:d}windo".format(wnumber)
         location_prefix = ' '.join([tabdo, windo]) if tabdo else windo
@@ -652,29 +652,29 @@ class multiview(object):
         # can discard the error code because if the previous window was the
         # same as what was closed, then we'll go to the alt window anyways.
         finally:
-            vim.newwindow.select(last)
+            vim.window.select(last)
         return window
 
     def show(self, tab, position, size, **options):
         number = self.buffer.number
-        tab = tab or vim.newtab.current()
+        tab = tab or vim.tab.current()
 
         # check if the current tab has a window open to our buffer.
         # if it doesn't, then we'll need to add a window one for it.
-        available = vim.newtab.buffers(tab)
+        available = vim.tab.buffers(tab)
         if number not in available:
             return self.add(tab, position, size, **options)
 
         # otherwise, we need to figure out the window id.
-        tabwindows = vim.newtab.windows(tab)
-        windows = vim.newbuffer.windows(number)
+        tabwindows = vim.tab.windows(tab)
+        windows = vim.buffer.windows(number)
         iterable = (window for window in tabwindows & windows)
 
         # we need to figure out the best window id, so we'll need to sort the windows
         # we received. we do this using the area of the window and its width or height.
-        Fkey_window_area = lambda window: (lambda width, height: width * height)(*vim.newwindow.dimensions(window))
-        Fkey_window_width = lambda window: (lambda width, height: (width * height, width))(*vim.newwindow.dimensions(window))
-        Fkey_window_height = lambda window: (lambda width, height: (width * height, height))(*vim.newwindow.dimensions(window))
+        Fkey_window_area = lambda window: (lambda width, height: width * height)(*vim.window.dimensions(window))
+        Fkey_window_width = lambda window: (lambda width, height: (width * height, width))(*vim.window.dimensions(window))
+        Fkey_window_height = lambda window: (lambda width, height: (width * height, height))(*vim.window.dimensions(window))
         Fkey_window = Fkey_window_width if position in {'above', 'below'} else Fkey_window_height if position in {'left', 'right'} else Fkey_window_area
 
         # Now we can sort our resulting windows and grab the largest one.
@@ -682,7 +682,7 @@ class multiview(object):
         if ordered:
             iterable = reversed(ordered)
             focused = next(iterable)
-            len(ordered) > 1 and logger.debug("Returning the currently showing window ({:d}) with the largest dimensions ({:s}) from the others ({:s}).".format(focused, "{:d}x{:d}".format(*vim.newwindow.dimensions(focused)), ', '.join(map("{:d}".format, sorted(iterable)))))
+            len(ordered) > 1 and logger.debug("Returning the currently showing window ({:d}) with the largest dimensions ({:s}) from the others ({:s}).".format(focused, "{:d}x{:d}".format(*vim.window.dimensions(focused)), ', '.join(map("{:d}".format, sorted(iterable)))))
             return focused
 
         # Otherwise, we can just ignore trying to figure out which window
@@ -691,11 +691,11 @@ class multiview(object):
         return -1
 
     def close(self):
-        last, number = vim.newwindow.current(), self.buffer.number
-        tab, windows = vim.newtab.current(), vim.newbuffer.windows(number)
+        last, number = vim.window.current(), self.buffer.number
+        tab, windows = vim.tab.current(), vim.buffer.windows(number)
 
         # Convert the window ids to a snapshot of each id keyed by the tab and window number.
-        window_locations = {window: vim.newwindow.tab_and_number(window) for window in windows}
+        window_locations = {window: vim.window.tab_and_number(window) for window in windows}
 
         # Now we'll extract the tab number into a list, and remove the
         # current tab from it so that we can close those windows last.
@@ -734,7 +734,7 @@ class multiview(object):
         logger.debug("Closed {:d} windows associated with buffer ({:d}) of which {:d} window{:s} were not managed by us ({:s}).".format(len(closed), number, len(unmanaged), '' if len(unmanaged) == 1 else 's', ','.join(unmanaged_description)))
 
         # If there are still any windows open, then bail and raise an exception.
-        remaining = vim.newbuffer.windows(number)
+        remaining = vim.buffer.windows(number)
         if len(remaining) > 0:
             raise vim.error("Unable to close {:d} window{:s} ({:s}) associated with buffer ({:d}).".format(len(remaining), '' if len(remaining) == 1 else 's', ','.join(map("{:d}".format, remaining)), number))
 
@@ -744,7 +744,7 @@ class multiview(object):
             self.buffer.close()
         finally:
             buffer, self.__buffer__ = self.__buffer__, None
-            vim.newwindow.select(last) if vim.newwindow.exists(last) else last
+            vim.window.select(last) if vim.window.exists(last) else last
         return
 
     # forward everything that makes this look like a file to the buffer.
@@ -759,12 +759,12 @@ class multiview(object):
     # hidden methods
     @classmethod
     def __repr_describe_window(cls, window):
-        tab, format = vim.newwindow.tab(window), "P{:d}".format if vim.newwindow.type(window) == 'preview' else "{:d}".format
+        tab, format = vim.window.tab(window), "P{:d}".format if vim.window.type(window) == 'preview' else "{:d}".format
         return '#'.join(["{:d}".format(tab), format(window)])
 
     def __repr__(self):
         cls, name, number = self.__class__, self.buffer.name, self.buffer.number
         description = "{:d}".format(name) if isinstance(name, integer_types) else "\"{:s}\"".format(name)
-        buffer_description = description if vim.newbuffer.exists(number) else "(missing) {:s}".format(description)
-        window_descriptions = map(self.__repr_describe_window, vim.newbuffer.windows(number))
+        buffer_description = description if vim.buffer.exists(number) else "(missing) {:s}".format(description)
+        window_descriptions = map(self.__repr_describe_window, vim.buffer.windows(number))
         return "<{:s} buffer:{:s} windows:({:s})>".format('.'.join([__name__, cls.__name__]), buffer_description, ','.join(window_descriptions))
