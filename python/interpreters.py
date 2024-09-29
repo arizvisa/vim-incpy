@@ -359,7 +359,9 @@ class interpreter(object):
     @classmethod
     def new(cls, *args, **options):
         options.setdefault('buffer', None)
-        return cls(*args, **options)
+        res = cls(*args, **options)
+        res.attach(), res.start()
+        return res
 
     def __init__(self, **kwds):
         core = {}.__class__(vim.gvars['incpy#CoreWindowOptions'])
@@ -464,7 +466,7 @@ class python_internal(interpreter):
         exec("exec(data, globals, locals{:s})".format(', closure=closure' if sys.version_info.major >= 3 and sys.version_info.minor >= 11 else ''))
 
     def start(self):
-        logger.warning("internal interpreter has already been (implicitly) started")
+        logger.debug("internal interpreter has already been (implicitly) started")
 
     def stop(self):
         logger.fatal("unable to stop internal interpreter as it is always running")
@@ -478,9 +480,12 @@ class external(interpreter):
         res = cls(**options)
         [ options.pop(item, None) for item in cls.view_options ]
         res.command, res.options = command, options
+        res.attach(), res.start()
         return res
 
     def attach(self):
+        if self.instance:
+            return
         logger.debug("connecting i/o from {!r} to {!r}".format(self.command, self.view))
         self.instance = process.spawn(self.view.write, self.command, **self.options)
         logger.info("started process {:d} ({:#x}): {:s}".format(self.instance.id, self.instance.id, self.command))
@@ -520,8 +525,11 @@ class external(interpreter):
         return "{:s} {{{!s}}}".format(res, self.instance)
 
     def start(self):
-        logger.info("starting process {!r}".format(self.instance))
-        self.instance.start()
+        self.attach()
+        if not self.instance.running:
+            logger.info("starting process {!r}".format(self.instance))
+            self.instance.start()
+        return
 
     def stop(self):
         logger.info("stopping process {!r}".format(self.instance))
