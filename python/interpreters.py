@@ -104,6 +104,57 @@ class interpreter_with_view(interpreter):
         self.__view__ = view = interface.multiview(buffer)
         return view
 
+    # window management using the view
+    def show(self, position, ratio_or_size, *options, **kwoptions):
+        '''Show a window to the interpreter at the specified position with the given ratio or size.'''
+        if position not in {'left', 'right', 'above', 'below'}:
+            raise vim.error("Unsupported window position ({:s}) was specified.".format(position))
+
+        elif not isinstance(ratio_or_size, (float, integer_types)):
+            raise vim.error("Unexpected type ({!s}) was specified as the ratio or size.".format(ratio_or_size.__class__))
+
+        # figure out the correct window size. if we were given a floating-point
+        # number, then this is a percentage of the current dimensions. otherwise,
+        # it's just a number of columns or rows depending on the chosen position.
+        ratio, (width, height) = ratio_or_size, vim.dimensions
+        size = ratio if isinstance(ratio_or_size, integer_types) else ratio * height if position in {'above', 'below'} else ratio * width
+
+        # now we need to extract the window options. we support both
+        # positional parameters and keyword parameters to build them.
+        [woptions] = options if options else [{}]
+        woptions.update(kwoptions)
+
+        # last thing to do is to show a window to the buffer using the
+        # view. we need to know the tab, though, so we extract that too.
+        tab = woptions.pop('tab', 0)
+        return self.view.show(tab, position, size, **woptions)
+
+    def hide(self, tab=0):
+        '''Hide the interpreter window that is visible on the specified tab.'''
+        windows = {window for window in self.available(tab)}
+
+        # now we need to figure out which window to hide in the tab. there can
+        # be more than one open, due to the user being able to manage things
+        # outside the plugin. but, we only focus on the windows that we manage.
+        ours = self.view.windows & windows
+
+        # we hide the largest one first which means we'll need to
+        # sort our list of managed windows by their dimensions.
+        Fkey_window_area = lambda window: (lambda width, height: width * height)(*vim.newwindow.dimensions(window))
+        ordered = sorted(ours, key=Fkey_window)
+
+        # grab the largest window from our sorted list, and proceed to hide it.
+        window = next(reversed(ordered), 0)
+        if window and vim.newwindow.exists(window):
+            return True if self.view.hide(window) > -1 else False
+        return False
+
+    def available(self, tab=0):
+        '''Return a list of the windows for the current interpreter on the specified tab.'''
+        available = vim.newtab.windows(tab if tab else vim.newtab.current())
+        windows = vim.newbuffer.windows(self.buffer)
+        return [window for window in available & windows]
+
 class newinternal(interpreter_with_view):
     """
     This class represents an interpreter that uses the internal
