@@ -345,19 +345,20 @@ function! s:generate_interpreter_cache_snippet(package)
         opt = {'winfixwidth':True, 'winfixheight':True} if interface.vim.gvars["incpy#WindowFixed"] > 0 else {}
         try:
             if len(program) > 0:
-                interpreter = interpreters.terminal if use_terminal else interpreters.external
-                cache = interpreter.new(program, opt=opt)
+                interpreter = interpreters.newterminal if use_terminal else interpreters.newexternal
+                cache = interpreter(program)
             else:
-                interpreter = interpreters.python_internal
-                cache = interpreter.new(opt=opt)
+                interpreter = interpreters.newinternal
+                cache = interpreter()
 
         # if we couldn't start the interpreter, then fall back to an internal one
         except Exception:
             hasattr(package, 'logger') and package.logger.fatal("error starting external interpreter: {:s}".format(program), exc_info=True)
             hasattr(package, 'logger') and package.logger.warning("falling back to internal python interpreter")
-            cache = interpreters.python_internal.new(opt=opt)
+            cache = interpreters.newinternal()
 
         # assign the interpreter object into our package
+        cache.start(interface.vim.gvars["incpy#WindowName"])
         package.cache = cache
     EOC
 
@@ -395,7 +396,7 @@ function! incpy#Range(begin, end)
 
     " Strip our input prior to its execution.
     let code_stripped = s:strip_by_option(g:incpy#ExecStrip, input_stripped)
-    call s:execute_interpreter_cache_guarded(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
+    call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
 
     " If it's not a list or a string, then we don't support it.
     if !(type(code_stripped) == v:t_string || type(code_stripped) == v:t_list)
@@ -433,16 +434,16 @@ endfunction
 
 function! incpy#Show()
     let parameters = map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)')
-    call s:execute_interpreter_cache_guarded(['view', 'show'], parameters)
+    call s:execute_interpreter_cache_guarded(['show'], parameters)
 endfunction
 
 function! incpy#Hide()
-    call s:execute_interpreter_cache_guarded(['view', 'hide'], [])
+    call s:execute_interpreter_cache_guarded(['hide'], [])
 endfunction
 
 """ Plugin interaction interface
 function! incpy#Execute(line)
-    call s:execute_interpreter_cache_guarded(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
+    call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
 
     call s:execute_interpreter_cache('communicate', [s:quote_single(a:line)])
     if g:incpy#OutputFollow
@@ -468,7 +469,7 @@ function! incpy#Evaluate(expr)
     let stripped = s:strip_by_option(g:incpy#EvalStrip, a:expr)
 
     " Evaluate and emit an expression in the target using the plugin
-    call s:execute_interpreter_cache_guarded(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
+    call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
     call s:communicate_interpreter_encoded(s:singleline(g:incpy#EvalFormat, "\"\\"), stripped)
 
     if g:incpy#OutputFollow
@@ -493,7 +494,7 @@ function! incpy#Halp(expr)
 
     " Execute g:incpy#HelpFormat in the target using the plugin's cached communicator
     if len(LetMeSeeYouStripped) > 0
-        call s:execute_interpreter_cache_guarded(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
+        call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
         call s:communicate_interpreter_encoded(s:singleline(g:incpy#HelpFormat, "\"\\"), s:escape_double(LetMeSeeYouStripped))
     endif
 endfunction
