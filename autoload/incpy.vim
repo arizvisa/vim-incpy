@@ -440,15 +440,6 @@ function! incpy#Hide()
     call s:execute_interpreter_cache_guarded(['view', 'hide'], [])
 endfunction
 
-" Attach or detach a buffer from the interpreter to a window
-function! incpy#Attach()
-    call s:execute_interpreter_cache_guarded('attach', [])
-endfunction
-
-function! incpy#Detach()
-    call s:execute_interpreter_cache_guarded('detach', [])
-endfunction
-
 """ Plugin interaction interface
 function! incpy#Execute(line)
     call s:execute_interpreter_cache_guarded(['view', 'show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'))
