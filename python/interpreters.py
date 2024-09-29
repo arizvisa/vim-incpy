@@ -141,9 +141,9 @@ class newinternal(interpreter_with_view):
         # private property that we can access if necessary.
         self.__workspace__ = [scope for scope in workspace]
 
-    def start(self):
-        '''Start the internal interpreter by attaching it to a new buffer.'''
-        view = super(newinternal, self).start(vim.gvars['incpy#WindowName'])
+    def start(self, name=''):
+        '''Start the internal interpreter by attaching it to a new buffer with the specified name.'''
+        view = super(newinternal, self).start(name or vim.gvars['incpy#WindowName'])
 
         # after creating the view, back up the current stdin, stdout, and stderr.
         self.state = sys.stdin, sys.stdout, sys.stderr
@@ -220,9 +220,9 @@ class newexternal(interpreter_with_view):
             return "{:s} {{{!r} {:s}}}".format(res, self.instance, self.command)
         return "{:s} {{{!s}}}".format(res, self.instance)
 
-    def start(self):
-        '''Start the process associated with the external interpreter.'''
-        cls, view = self.__class__, super(newexternal, self).start(vim.gvars['incpy#WindowName'])
+    def start(self, name=''):
+        '''Start the process associated with the external interpreter in a buffer with the specified name.'''
+        cls, view = self.__class__, super(newexternal, self).start(name or vim.gvars['incpy#WindowName'])
 
         self.logger.debug("Spawning process for {:s} in buffer {:d} with command: {:s}.".format('.'.join([getattr(cls, '__module__', __name__), cls.__name__]), self.buffer, self.command))
         self.instance = instance = process.spawn(view.write, self.command, **self.command_options)
@@ -286,7 +286,6 @@ class newterminal(interpreter_with_view):
         # update the options with the buffer name and any
         # options that were provided to us by the caller.
         options = {key : value for key, value in default_options.items()}
-        #options.setdefault('term_name', vim.gvars['incpy#WindowName'])
         options.update(kwargs)
         self.command_options = options
 
@@ -309,19 +308,18 @@ class newterminal(interpreter_with_view):
 
         vim.terminal.send(self.buffer, data)
 
-    def start(self):
-        '''Start the process associated with the terminal interpreter.'''
+    def start(self, name=''):
+        '''Start the process associated with the terminal interpreter in a new buffer with the specified name.'''
         options = {key : value for key, value in self.command_options.items()}
 
         # because python is maintained by fucking idiots
         ignored_env = {'PAGER', 'MANPAGER'}
         filtered_env = {name : '' if name in ignored_env else value for name, value in __import__('os').environ.items() if name not in ignored_env}
         filtered_env['TERM'] = 'emacs'
-
-        #options['env'] = vim.Dictionary(filtered_env)   # because VIM doesn't do as it's told
+        #options['env'] = vim.Dictionary(filtered_env)   # because VIM doesn't do what it's told recursively
 
         # create the new terminal to get the buffer for the process.
-        options['term_name'] = vim.gvars['incpy#WindowName']
+        options['term_name'] = name or vim.gvars['incpy#WindowName']
         buffer = vim.terminal.start(self.command, **options)
         return super(newterminal, self).start(buffer)
 
