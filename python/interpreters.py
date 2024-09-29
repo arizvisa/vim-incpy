@@ -155,7 +155,7 @@ class interpreter_with_view(interpreter):
         windows = vim.buffer.windows(self.buffer)
         return [window for window in available & windows]
 
-class newinternal(interpreter_with_view):
+class internal(interpreter_with_view):
     """
     This class represents an interpreter that uses the internal
     python instance that is started by the editor. It can be
@@ -165,7 +165,7 @@ class newinternal(interpreter_with_view):
     """
 
     def __init__(self, *context):
-        super(newinternal, self).__init__()
+        super(internal, self).__init__()
         self.logger = logger.getChild('internal')
         self.state = ()
 
@@ -194,7 +194,7 @@ class newinternal(interpreter_with_view):
 
     def start(self, name=''):
         '''Start the internal interpreter by attaching it to a new buffer with the specified name.'''
-        view = super(newinternal, self).start(name or vim.gvars['incpy#WindowName'])
+        view = super(internal, self).start(name or vim.gvars['incpy#WindowName'])
 
         # after creating the view, back up the current stdin, stdout, and stderr.
         self.state = sys.stdin, sys.stdout, sys.stderr
@@ -249,7 +249,7 @@ class newinternal(interpreter_with_view):
         globals, locals, closure = (self.__workspace__ + 3 * [None])[:3]
         exec("exec(data, globals, locals{:s})".format(', closure=closure' if sys.version_info.major >= 3 and sys.version_info.minor >= 11 else ''))
 
-class newexternal(interpreter_with_view):
+class external(interpreter_with_view):
     """
     This interpreter is responsible for spawning an arbitrary
     process and capturing its output directly into a buffer.
@@ -258,7 +258,7 @@ class newexternal(interpreter_with_view):
     """
 
     def __init__(self, command, **kwargs):
-        super(newexternal, self).__init__()
+        super(external, self).__init__()
         self.logger = logger.getChild('external')
         self.instance = None
 
@@ -266,14 +266,14 @@ class newexternal(interpreter_with_view):
         self.command_options = kwargs.get('options', {})
 
     def __repr__(self):
-        res = super(newexternal, self).__repr__()
+        res = super(external, self).__repr__()
         if self.instance and self.instance.running:
             return "{:s} {{{!r} {:s}}}".format(res, self.instance, self.command)
         return "{:s} {{{!s}}}".format(res, self.instance)
 
     def start(self, name=''):
         '''Start the process associated with the external interpreter in a buffer with the specified name.'''
-        cls, view = self.__class__, super(newexternal, self).start(name or vim.gvars['incpy#WindowName'])
+        cls, view = self.__class__, super(external, self).start(name or vim.gvars['incpy#WindowName'])
 
         self.logger.debug("Spawning process for {:s} in buffer {:d} with command: {:s}.".format('.'.join([getattr(cls, '__module__', __name__), cls.__name__]), self.buffer, self.command))
         self.instance = instance = process.spawn(view.write, self.command, **self.command_options)
@@ -310,7 +310,7 @@ class newexternal(interpreter_with_view):
             self.write(echonewline.format(echo))
         self.instance.write(data)
 
-class newterminal(interpreter_with_view):
+class terminal(interpreter_with_view):
     """
     This interpreter is responsible for spawning an arbitrary
     process as a terminal job which writes its output directly
@@ -321,7 +321,7 @@ class newterminal(interpreter_with_view):
     """
 
     def __init__(self, command, **kwargs):
-        super(newterminal, self).__init__()
+        super(terminal, self).__init__()
 
         self.logger = logger.getChild('terminal')
         self.command = command
@@ -341,7 +341,7 @@ class newterminal(interpreter_with_view):
         self.command_options = options
 
     def __repr__(self):
-        res = super(newterminal, self).__repr__()
+        res = super(terminal, self).__repr__()
         return "{:s} {{{!r}}}".format(res, self.command)
 
     def communicate(self, data, silent=False):
@@ -372,7 +372,7 @@ class newterminal(interpreter_with_view):
         # create the new terminal to get the buffer for the process.
         options['term_name'] = name or vim.gvars['incpy#WindowName']
         buffer = vim.terminal.start(self.command, **options)
-        return super(newterminal, self).start(buffer)
+        return super(terminal, self).start(buffer)
 
     def stop(self):
         '''Stop the process associated with the terminal interpreter.'''

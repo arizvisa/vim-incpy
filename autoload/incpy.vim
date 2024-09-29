@@ -345,17 +345,17 @@ function! s:generate_interpreter_cache_snippet(package)
         opt = {'winfixwidth':True, 'winfixheight':True} if interface.vim.gvars["incpy#WindowFixed"] > 0 else {}
         try:
             if len(program) > 0:
-                interpreter = interpreters.newterminal if use_terminal else interpreters.newexternal
+                interpreter = interpreters.terminal if use_terminal else interpreters.external
                 cache = interpreter(program)
             else:
-                interpreter = interpreters.newinternal
+                interpreter = interpreters.internal
                 cache = interpreter()
 
         # if we couldn't start the interpreter, then fall back to an internal one
         except Exception:
             hasattr(package, 'logger') and package.logger.fatal("error starting external interpreter: {:s}".format(program), exc_info=True)
             hasattr(package, 'logger') and package.logger.warning("falling back to internal python interpreter")
-            cache = interpreters.newinternal()
+            cache = interpreters.internal()
 
         # assign the interpreter object into our package
         cache.start(interface.vim.gvars["incpy#WindowName"])
