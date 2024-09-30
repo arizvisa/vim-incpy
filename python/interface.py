@@ -1,4 +1,4 @@
-import sys, functools, codecs, operator, itertools
+import sys, functools, codecs, operator, itertools, contextlib
 from . import integer_types, string_types, logger
 
 logger = logger.getChild(__name__)
@@ -275,6 +275,25 @@ else:
                     raise vim.error("Unable to find buffer from parameter : {!s}".format(identity))
                 return number
 
+            @classmethod
+            @contextlib.contextmanager
+            def update(cls, identity):
+                '''Return a context manager that can be used to modify the specified buffer.'''
+                number = cls.of(identity)
+                buffer = cls.by(number)
+                needs_preservation = 'modifiable' in buffer.options
+                modifiable = buffer.options['modifiable'] if needs_preservation else True
+                try:
+                    if needs_preservation and not modifiable:
+                        buffer.options['modifiable'] = True
+                    yield buffer
+
+                finally:
+                    if needs_preservation:
+                        buffer.options['modifiable'] = modifiable
+                    pass
+                return
+
         class window(object):
             exists = staticmethod(lambda window: -1 < int(vim.eval("winbufnr({!s})".format(window))))
 
@@ -467,8 +486,10 @@ class buffer(object):
 
     def write(self, data):
         lines = iter(data.split('\n'))
-        self.buffer[-1] += next(lines)
-        [ self.buffer.append(item) for item in lines ]
+        with vim.buffer.update(self.buffer) as buffer:
+            buffer[-1] += next(lines)
+            [ buffer.append(item) for item in lines ]
+        return
 
     def writable(self):
         return False
