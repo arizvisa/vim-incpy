@@ -246,16 +246,16 @@ function! s:execute_python_in_workspace(package, command)
     execute printf("pythonx (lambda F, ns: (lambda s: F(s, ns, ns)))(%s, %s)(%s)", l:python_execute, l:python_workspace, strings)
 endfunction
 
-function! s:execute_interpreter_cache(method, parameters)
+function! s:execute_interpreter_cache(method, parameters, keywords={})
     let l:cache = [printf('__import__(%s)', s:quote_single(g:incpy#PackageName)), 'cache']
     let l:method = (type(a:method) == v:t_list)? a:method : [a:method]
-    call s:execute_python_in_workspace(g:incpy#PackageName, printf('%s(%s)', join(l:cache + l:method, '.'), join(a:parameters, ', ')))
+    call s:execute_python_in_workspace(g:incpy#PackageName, printf('%s(%s, **%s)', join(l:cache + l:method, '.'), join(a:parameters, ', '), s:render_as_python(a:keywords)))
 endfunction
 
-function! s:execute_interpreter_cache_guarded(method, parameters)
+function! s:execute_interpreter_cache_guarded(method, parameters, keywords={})
     let l:cache = [printf('__import__(%s)', s:quote_single(g:incpy#PackageName)), 'cache']
     let l:method = (type(a:method) == v:t_list)? a:method : [a:method]
-    call s:execute_python_in_workspace(g:incpy#PackageName, printf("hasattr(%s, %s) and %s(%s)", join(slice(l:cache, 0, -1), '.'), s:quote_single(l:cache[-1]), join(l:cache + l:method, '.'), join(a:parameters, ', ')))
+    call s:execute_python_in_workspace(g:incpy#PackageName, printf("hasattr(%s, %s) and %s(%s, **%s)", join(slice(l:cache, 0, -1), '.'), s:quote_single(l:cache[-1]), join(l:cache + l:method, '.'), join(a:parameters, ', '), s:render_as_python(a:keywords)))
 endfunction
 
 function! s:communicate_interpreter_encoded(format, code)
