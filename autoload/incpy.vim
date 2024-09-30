@@ -382,6 +382,27 @@ function! s:generate_interpreter_view_snippet(package)
     return printf(join(create_view, "\n"), s:quote_single(a:package))
 endfunction
 
+function! s:get_window_options(other={})
+    let core = g:incpy#CoreWindowOptions
+
+    " Initialize our result dictionary with the core window options.
+    let result = {}
+    for o in keys(core)
+        let result[o] = core[o]
+    endfor
+
+    " Specially handle the window preview option.
+    if exists('g:incpy#WindowPreview')
+        let result['preview'] = g:incpy#WindowPreview
+    endif
+
+    " Merge any of the other options that we were given
+    for o in keys(a:other)
+        let result[o] = a:other[o]
+    endfor
+    return result
+endfunction
+
 """ Public interface and management
 
 " Execute the specified lines within the current interpreter.
