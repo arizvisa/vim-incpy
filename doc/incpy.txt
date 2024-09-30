@@ -32,64 +32,68 @@ COMMANDS                                        *incpy-commands*
 ==============================================================================
 HISTORY
 
-    v29:    ~2024       Added this documentation.. after all of this time.
-    v28:    ~2024       Refactored the plugin layout so that the python
+    v24:    Oct, 2024   Added this documentation.. after all of this time.
+    v23:    Jul, 2024   Refactored the plugin layout so that the python
                         logic is better isolated from the vimscript logic.
                         This cleans up the python containing the buffer,
                         window, and process management with the addition of
                         splitting up the vimscript into separate components.
-    v27:    ~2024       Modified the expression evaluation so that all text
+    v22:    Aug, 2023   Modified the options for configuring how text should
+                        be stripped before being transmitted so that it can
+                        take function and list types instead of a regex.
+    v21:    Feb, 2023   Modified the expression evaluation so that all text
                         is encoded before it gets sent to the target.
-    v26:    ~2024       Modified the expression evaluation so that all text
-                        is encoded before it gets sent to the target.
-    v25:    ~2023       Added support for disabling the paging used by the
-                        help for the internal python interpreter.
-    v24:    ~2023       Added a new interpreter type that supports using the
-                        terminal if vim says that the feature is available.
-    v23:    ~2022       Added support for configuring the way that text is
+    v20:    Jan, 2023   Added support for disabling the paging used by the
+                        help for the internal python interpreter and a new
+                        interpreter type that uses the terminal if vim says
+                        the feature is available.
+    v19:    Dec, 2022   Added support for configuring the way that text is
                         stripped before executing it in the target.
-    v22:    ~2021       Ensure that the PYTHONSTARTUP script is executed upon
+    v18:    Dec, 2021   Ensure that the PYTHONSTARTUP script is executed upon
                         initializing the plugin with the internal interpreter.
-    v21:    ~2020       Fixed current expression identification to support
-                        older versions of vim, and added an alternative
-                        binding for supporting vim on the windows platform.
-    v20:    ~2020       Added support for recreating the output buffer if
+    v17:    Aug, 2020   Added support for recreating the output buffer if
                         it has been accidentally removed by the user.
-    v19:    ~2020       Reworked the error handling to support vim's usage of
-                        both new-style and old-style exceptions.
-    v18:    ~2020       Modified the monitor class to use bytes exclusively
+    v16:    Jul, 2020   Fixed current expression identification to support
+                        older versions of vim, added an alternative binding
+                        for vim on the windows platform, and reworked the
+                        error handling to support vim's usage of both
+                        new-style and old-style exceptions.
+    v15:    Apr, 2020   Modified the monitor class to use bytes exclusively
                         and added support for using alternative encodings.
-    v17:    ~2019       Added support for compatibility with python3.
-    v16:    ~2018       Changed the default keyboard mappings to avoid
-                        potential conflicts with other useful plugins.
-    v15:    ~2018       Split up the concept of execution between expression
-                        evaluation and line-by-line execution.
-    v14:    ~2018       Added options for configuring the locking mechanism
-                        to use when asynchronously updating the output buffer.
-    v13:    ~2018       Added support for customizing the format used when
-                        asking the target process for help.
-    v12:    ~2018       Added the ability to configure how input should be
-                        formatted before transmitting to the target process.
-    v11:    ~2017       Added guards to avoid adding entries to the jumplist
+    v14:    Nov, 2019   Added support for compatibility with python3.
+    v13:    Dec, 2018   Added support for customizing the format used when
+                        asking the target process for help. Split up the
+                        concept of execution between expression evaluation
+                        and line-based. Changed keyboard mappings to avoid
+                        conflicting with other useful plugins.
+    v12:    Oct, 2018   Added the ability to configure how input should be
+                        formatted before transmitting, and options for
+                        configuring the locking mechanism to use when
+                        updating the output buffer for the target process.
+    v11:    Jun, 2018   Added guards to avoid adding entries to the jumplist
                         when when tailing the output window for a process.
-    v10:    ~2017       Added support for lightweight threads (greenlets)
+    v10:    Feb, 2017   Added support for lightweight threads (greenlets)
                         when capturing output from an external process.
-    v9:     ~2016       Added support for multithreading to allow the
+    v9:     Jun, 2016   Added support for multithreading to allow the
                         external process to read and write to a vim buffer
                         as it is currently being used.
-    v8:     ~2015       Updated the class used for exchanging output with
-                        a target process so that it can take input from
-                        either a generator or callable.
-    v7:     ~2015       Added public interface for managing process.
+    v8:     Oct, 2015   Refactored the interface for managing a process,
+                        and updated it so that it can take input from
+                        either a generator or a callable.
+    v7:     Jan, 2015   Added separate interpreter types for distinguishing
+                        between executing internal or external processes.
                         Reworked the implementation to hide it within a
                         dynamically-created module instead of a closure.
-    v6:     ~2015       Added separate interpreter types for distinguishing
-                        between executing internal or external processes.
-    v5:     ~2014       Refactored the python class for monitoring the target
+    v6:     Oct, 2014   Refactored the python class for monitoring the target
                         in order to allow its usage outside the plugin.
-    v4:     ~2014       Moved from a hack-up dotfile into its own repository.
-    v3:     ~2011       Added support for external language interpreters.
-    v2:     ~2008       Added more options to configure window placement.
+    v5:     Sep, 2014   Added support for the "clientserver" feature so that
+                        asynchronous buffer updates are shoveled through
+                        a pipe reducing the risk of races causing instability.
+    v4:     May, 2014   Migrated all related scripts and hackery from their
+                        dotfiles into their own source code repository.
+    v3:     ~2011       Added support for transmitting selected text to a
+                        configured external language interpreter.
+    v2:     ~2008       Added more options to customize window placement.
     v1:     ~2007       Added support for autohiding the output window and
                         tailing the window when its buffer has been written.
     v0:     ~2005       Prototype based on an idea that bniemczyk@gmail.com
