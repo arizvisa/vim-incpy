@@ -467,7 +467,7 @@ function! incpy#SetupPythonInterpreter(package)
     call incpy#SetupInterpreterView(a:package)
 
     """ Set any of the specified options for the interpreter interface.
-    if g:incpy#WindowStartup | call incpy#Show() | endif
+    if g:incpy#WindowStartup && !(&diff)| call incpy#Show() | endif
 
 endfunction
 
