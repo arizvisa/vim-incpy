@@ -341,8 +341,7 @@ function! s:generate_interpreter_cache_snippet(package)
         program = interface.vim.gvars["incpy#Program"]
         use_terminal = interface.vim.eval('has("terminal")') and interface.vim.gvars["incpy#Terminal"]
 
-        # spawn interpreter requested by user with the specified options
-        opt = {'winfixwidth':True, 'winfixheight':True} if interface.vim.gvars["incpy#WindowFixed"] > 0 else {}
+        # figure out which interpreter to use and then instantiate it.
         try:
             if len(program) > 0:
                 interpreter = interpreters.terminal if use_terminal else interpreters.external
@@ -394,6 +393,12 @@ function! s:get_window_options(other={})
     " Specially handle the window preview option.
     if exists('g:incpy#WindowPreview')
         let result['preview'] = g:incpy#WindowPreview
+    endif
+
+    " If the user wants the window to be fixed, then set the correct options.
+    if exists('g:incpy#WindowFixed') && g:incpy#WindowFixed
+        let result['winfixwidth'] = v:true
+        let result['winfixheight'] = v:true
     endif
 
     " Merge any of the other options that we were given
