@@ -466,9 +466,6 @@ function! incpy#SetupPythonInterpreter(package)
     call incpy#SetupInterpreter(a:package)
     call incpy#SetupInterpreterView(a:package)
 
-    """ Set any of the specified options for the interpreter interface.
-    if g:incpy#WindowStartup | call incpy#Show() | endif
-
 endfunction
 
 """ Mapping of vim commands and keys
@@ -533,6 +530,10 @@ function! incpy#LoadPlugin()
     call incpy#SetupPythonInterpreter(g:incpy#PackageName)
     call incpy#SetupCommands()
     call incpy#SetupKeys()
+
+    " if we've been told to create a window on startup, then show the
+    " window when the "VimEnter" autocmd event has been triggered.
+    autocmd VimEnter * if g:incpy#WindowStartup | call incpy#Show() | endif
 
     " if we're using an external program, then we can just ignore the dotfile
     " since it really only makes sense when using the python interpreter.
