@@ -540,10 +540,6 @@ function! incpy#LoadPlugin()
         call incpy#ImportDotfile()
     endif
 
-    " on entry, silently import the user module to honor any user-specific configurations
-    autocmd VimEnter * call incpy#Attach()
-    autocmd VimLeavePre * call incpy#Detach()
-
     " if greenlets were specifed then make sure to update them during cursor movement
     if g:incpy#Greenlets
         autocmd CursorHold * pythonx __import__('gevent').idle(0.0)
