@@ -1,23 +1,23 @@
 *incpy.txt*	Incremental development for Python and other interpreters.
-Author:		Ali Rizvi-Santiago <arizvisa@gmail.com>
+Author:		Ali Rizvi-Santiago <arizvisa-at-gmail-com>
 
 ==============================================================================
 INTRODUCTION								*incpy*
 
-This plugin provides wrappers around buffers and windows in order to facilitate
-immediate interaction with another process of some sort. Typically the other
-process will be an interpreter, but any process that exchanges data within
-standard input, standard output, or standard error can be used. If no process
-is configured, the plugin will use the internal python interpreter for the
-interaction.
+This plugin provides wrappers around buffers and windows in order to
+facilitate immediate interaction with another process of some sort. Typically
+the other process will be an interpreter, but any process that exchanges data
+within standard input, standard output, or standard error can be used. If no
+process is configured, the plugin will use the internal python interpreter
+for the interaction.
 
 The plugin requires the editor to be compiled with either |+python| or
-|+python3| support. The existence of these features can be checked by using
-|:version| or with |has-python| using either `has("python")`, `has("python3")`, or
-`has("pythonx")`. If |+terminal| support is available in the editor, the plugin
-will use it for running external interpreters. If terminal support is not
-supported by the editor, the plugin will capture all input and output from
-the target process into a regular buffer.
+|+python3| support. The existence of these features can be checked by viewing
+|:version| or with |has-python| by using either `has("python")`, `has("python3")`
+or `has("pythonx")`. If |+terminal| support is available in the editor, the
+plugin will use it for running external interpreters. If terminal support
+is not supported by the editor, the plugin will capture all input and output
+from the target process into a regular buffer.
 
 Once the plugin has been loaded, any output from the external process or
 internal python interpreter will be captured in an output buffer for viewing
@@ -118,53 +118,166 @@ which is loaded upon starting the editor.
 The first set of options is responsible for customizing how the window is
 to be presented to the user. These options are as follows:
 
-:let *g:incpy#WindowName* = {string}
-	Specify the default name of the interpreter output buffer. By default
-	this is set to `"Scratch"`.
+:let *g:incpy#WindowName* = (|String|)
+	Specify the default name of the interpreter output buffer. By
+	default this is set to `"Scratch"`.
 
-:let *g:incpy#WindowStartup* = {boolean}
-	Display the output window for the interpreter upon startup. By default
-	this is set to `v:true`.
+:let *g:incpy#WindowStartup* = (|Boolean|)
+	Display the output window for the interpreter upon startup. By
+	default this is set to `v:true`.
 
-:let *g:incpy#WindowPreview* = {boolean}
-	Used to specify that the interpreter output should be displayed within
-	a preview window. This is only available if the editor has been
-	compiled with the |+quickfix| feature. By default this option is set
-	to `v:true`.
+:let *g:incpy#WindowPreview* = (|Boolean|)
+	Used to specify that the interpreter output should be displayed
+	within a preview window. This is only available if the editor has
+	been compiled with the |+quickfix| feature. By default this option is
+	set to `v:true`.
 
-:let *g:incpy#WindowPosition* = {string} 'left', 'right', 'above', 'below'
+:let *g:incpy#WindowPosition* = (|String|) 'left', 'right', 'above', 'below'
 	The position to create the window at during execution. The position
 	specifies whether the output window should be created by vertically
 	or horizontally splitting the current window. By default this is
 	set to `"below"`.
 
-:let *g:incpy#WindowRatio* = {float}
+:let *g:incpy#WindowRatio* = (|Float|)
 	The ratio of the window size relative to the current window being
 	splitted. By default this ratio is set to `0.333333` or `1/3`.
 
-:let *g:incpy#WindowFixed* = {boolean}
+:let *g:incpy#WindowFixed* = (|Boolean|)
 	Specify whether the window width and height should be kept when
 	windows are opened or closed. This is responsible for setting the
 	|winfixheight| and |winfixwidth| options on the output window.
 
-:let *g:incpy#WindowOptions* = {dictionary}
+:let *g:incpy#WindowOptions* = (|Dictionary|)
 	Customize the options for the window displaying the interpreter
-	output. This dictionary is used to set the local window options using
-	the |:setlocal| command.
+	output. This dictionary is used to set the local window options
+	using the |:setlocal| command.
 
-:let *g:incpy#Program* = {string}
+:let *g:incpy#OutputFollow* = (|Boolean|)
+	Specify whether the interpreter window should always seek to the
+	most recent line when the output buffer has been written to. By
+	default, this will be set to `v:true`.
+
+:let *g:incpy#Program* = (|String|)
 	This global variable specifies the program name and parameters to
 	run as the interpreter. This will switch the interpreter being used
 	from |incpy-interpreter-internal| to |incpy-interpreter-external| or
 	|incpy-interpreter-terminal|. By default this will be empty which
 	will result in the internal python interpreter being used.
 
-:let *g:incpy#PythonStartup* = {string}
+:let *g:incpy#PythonStartup* = (|String|)
 	This global variable specifies the path of a dotfile to use for
 	initializing the scope of an |incpy-interpreter-internal|. By default
 	this will use the value of the |$PYTHONSTARTUP| environment variable,
 	or |$HOME/.pythonrc.py| if the environment variable is not available.
 
+==============================================================================
+CONFIGURATION (EXTERNAL)			*incpy-configuration-external*
+
+By default the configuration is designed for transmitting code to a |python|
+interpreter. This is done by formatting the text to remove any unnecessary
+whitespace, and then formatting that result depending on whether it is to
+be evaluation as an expression or executed in the target interpreter as-is.
+
+If a different program has been specified with the |g:incpy#Program| option,
+however, the logic for stripping and formatting the text might be incorrect.
+To accommodate the difference in syntax for various interpreters, these
+processes for stripping and formatting input text are configurable.
+
+For examples of configurations that might be used for different programs,
+please see the |incpy-configuration-examples| section.
+
+Stripping of input text~
+					*incpy-configuration-stripping*
+The configuration options for stripping the input text can take either a
+|Boolean|, |String|, or |Funcref| value. If a |Boolean| is specified, the input
+will have all of its encompassing whitespace trimmed. If a |String| is
+used, then it will be used with the |map()| function to transform the
+input. If a |FuncRef| is used, it will be called with the input text
+passed as its only parameter. The string that is returned by this
+function will then be passed to the interpreter.
+
+If the |python| interpreter for the editor is being used, the default
+process for stripping |python| code will result in stripping any
+indentation found at the beginning of the transmitted code.
+
+Variables used for stripping input text~
+						*incpy-variables-stripping*
+The following variables are available for configuring how input text
+should be stripped:
+
+:let *g:incpy#InputStrip* = (|Boolean|, |String|, or |Funcref|}
+	This variable describes how text being passed transparently to
+	the interpreter should be stripped.
+
+:let *g:incpy#ExecStrip* = (|Boolean|, |String|, or |Funcref|)
+	This variable describes how text that is to be executed should
+	be stripped before being passed to the interpreter.
+
+:let *g:incpy#EvalStrip* = (|Boolean|, |String|, or |Funcref|)
+	This variable describes how text that is to be evaluated by the
+	interpreter is to be stripped.
+
+Formatting of input text~
+					*incpy-configuration-formatting*
+Depending on the interpreter, the input text may need to be specially
+formatted in order to differentiate evaluation from execution. The
+configuration variables for formatting input text are all specified as a
+|String| and follows the syntax that is based the `help(FORMATTING)` page found
+inside the the |python| documentation.
+
+An example format string for using an expression with the with the `help()`
+python command could be:
+>
+	:let g:incpy#EvalFormat = "help({})\n"
+<
+This will result in displaying the help in the interpreter for whatever
+expression has been evaluated. The following list contains all of the
+available options that can be used for configuring input formatting.
+
+Variables used for Formatting input text~
+
+As prior mentioned, each formatting variable takes a |String| containing the
+desired format specification. Each of the following variables can be
+configured to specify how input text is to be formatted before sending to
+the interpreter:
+						*incpy-variables-formatting*
+:let *g:incpy#ExecFormat* = {formatspec}
+	This variable is used to format single or multiple lines that are
+	to be executed. An example format that may be used with |python|
+	can be as follows:
+>
+	:let g:incpy#ExecFormat = "{}\n"
+<
+:let *g:incpy#EvalFormat* = {formatspec}
+	This variable is used to format an expression composed of a
+	single or multiple lines before being passed to the interpeter.
+	An example format that may be used with |python| can be:
+>
+	:let g:incpy#EvalFormat = "print(({}))\n"
+<
+:let *g:incpy#EchoFormat* = {formatspec}
+	This variable is used to format each individual line that is to be
+	displayed within the output buffer before actually executing or
+	evaluating them. This is necessary for supporting interpreters that
+	do not echo their input by default.
+
+:let *g:incpy#EchoNewline* = {formatspec}
+	This variable is used to format each block of transmitted input that
+	is to be displayed within the buffer before actually executing or
+	evaluating it. This is used in combination with |g:incpy#EchoFormat|
+	and is necessary for supporting interpreters that do not echo their
+	input by default.
+
+:let *g:incpy#HelpFormat* = {formatspec}
+	This variable is used to format text into an expression that will
+	display the `help()` for it. This is specific to |python|, but can be
+	used with other languages that allow using a keyword to view the
+	documentation.
+
+	An example format string that can be used with |python| is:
+>
+	:let g:incpy#EvalFormat = "help(({}))\n"
+<
 ==============================================================================
 CONFIGURATION (MISCELLANEOUS)			*incpy-configuration-misc*
 
@@ -172,29 +285,29 @@ The following options are also available to customize the implementation of
 the plugin. Generally these options are only used internally, but are listed
 here in case the user wishes to tinker with them.
 
-:let *g:incpy#Terminal* = {boolean}
+:let *g:incpy#Terminal* = |Boolean|
 	This variable is used to configure which external interpreter type
 	to use. This will determine whether the |incpy-interpreters-terminal|
 	or |incpy-interpreters-external| interpreter is chosen. By default
 	this is set to `v:true` if the |+terminal| feature is available in
 	the editor.
 
-:let *g:incpy#PluginName* = {string}
+:let *g:incpy#PluginName* = |String|
 	This variable is internal and contains the name of the plugin. It is
 	only used for logging, but can be configured. By default this is
 	specified as `"incpy"`.
 
-:let *g:incpy#PackageName* = {string}
+:let *g:incpy#PackageName* = |string|
 	This variable is internal and contains a string that is used to
 	isolate the implementation of this plugin. It is the name of the
 	python module that is used as a scope when executing plugin-related
 	functionality. By default this is configured as `"__incpy__"`.
 
-:let *g:incpy#Greenlets* = {boolean}
+:let *g:incpy#Greenlets* = |Boolean|
 	This customizes the method that the |incpy-interpreters-external|
-	interpreter uses to write asynchronously into its output buffer. This
-	is chosen by default based on whether the 'gevent' module is actually
-	importable by the |python| interpreter used for the editor.
+	interpreter uses to write asynchronously into its output buffer.
+	This is chosen by default based on whether the 'gevent' module is
+	actually importable in the |python| interpreter used by the editor.
 
 ==============================================================================
 COMMANDS						*incpy-commands*
@@ -244,13 +357,12 @@ can be called directly.
 	View the python help for the currently selected text.
 
 ==============================================================================
-PUBLIC API                                      	*incpy-functions-public*
+PUBLIC API						*incpy-functions-public*
 
 This plugin provides a number of functions to the user which can be used
 to customize or script the interaction with their interpreter.
 
 The following functions are available to the user:
-
 							*incpy#Start()*
 incpy#Start()
 	Start the configured interpreter.
@@ -306,7 +418,7 @@ incpy#HalpSelected() range
 	View the help for the current selection within the interpreter.
 
 ==============================================================================
-PRIVATE (INTERNAL)                              *incpy-functions-private*
+PRIVATE (INTERNAL)				*incpy-functions-private*
 
 The setup of an interpreter at startup is done with the following functions.
 These are intended to be used internally, but can be useful if the user
@@ -348,6 +460,169 @@ incpy#SetupInterpreterView({package})
 	Set up the view for an interpreter using the given {package}
 	as its scope.
 
+==============================================================================
+CONFIGURATION (EXAMPLES)			*incpy-configuration-examples*
+
+This section lists a number of example configurations that might be used by
+any of the interpreters available on a system. It is recommended that the
+user match (|expr-=~|) against the value for |g:incpy#Program| in order to
+determine which configuration settings to use.
+
+Python~
+
+The first example configuration is for an external |python| interpreter. Most
+of its stripping and formatting comes with the plugin by default. This
+example steals some of its options from the plugin in order to disable the
+pager for `help()` and to use the same method the |python| interpreter uses
+for emitting the result of an expression.
+>
+	let g:incpy#Program = '/usr/bin/env python -i'
+
+	let g:incpy#Echo = 1
+	let g:incpy#InputStrip = v:true
+	let g:incpy#WindowOptions = {
+	\	"filetype": "python",
+	\	"cursorcolumn": v:true,
+	\	"cursorline": v:true
+	\}
+
+	let g:incpy#EchoFormat = '{}'
+	let g:incpy#EvalFormat = "__import__(\"sys\").displayhook(({}))\n"
+
+	let _ =<< trim EOS
+		%1$s.getpager = lambda: %1$s.plainpager
+		try: exec("%2$s({0})")
+		except SyntaxError: %3$s("{0}")
+	EOS
+	let g:incpy#HelpFormat = printf(
+	\	join(_, "\n") . "\n\n",
+	\	'__import__("pydoc")',
+	\	escape('__import__("builtins").help', '"'),
+	\	'__import__("builtins").help',
+	\)
+<
+Perl~
+
+The following is a basic example demonstrating configuration for the perl
+interpreter. It is incredibly basic and does not provide much.
+>
+	let g:incpy#Program = '/usr/bin/env perl'
+	let g:incpy#WindowOptions = {"filetype": "perl"}
+	let g:incpy#Echo = 1
+	let g:incpy#EchoFormat = "> $ {}"
+	let g:incpy#HelpFormat = "{}\n"
+<
+Bash~
+
+The following is a basic example for the GNU Bourne-Again Shell. It
+sets the parameters to ensure that the started shell is an interfactive
+logon shell, but doesn't do too much else.
+>
+	let g:incpy#Program = "/usr/bin/env bash -il"
+
+	let g:incpy#Echo = 1
+	let g:incpy#EchoFormat = "{}\n"
+	let g:incpy#InputStrip = v:true
+	let g:incpy#OutputFollow = 1
+
+	let g:incpy#ExecFormat = "{}\n"
+	let g:incpy#EvalFormat = "echo \"${}\"\n"
+	let g:incpy#HelpFormat = "help {}\n"
+<
+F#~
+
+The following is a very minimal configuration for the FSharp programming
+language. It disables colors and readline support using the command line,
+and provides only basic support for displaying the help for the language.
+>
+	let g:incpy#Program = join([
+	\	'/usr/bin/env dotnet fsi',
+	\	'--langversion:latest',
+	\	'--utf8output',
+	\	'--consolecolors-',
+	\	'--gui-',
+	\	'--readline-'
+	\], ' ')
+
+	let g:incpy#WindowOptions = {"filetype": "fsharp"}
+
+	let g:incpy#Echo = 1
+	let g:incpy#EchoFormat = "{}\n\n"
+	let g:incpy#InputStrip = v:true
+	let g:incpy#OutputFollow = 1
+	let g:incpy#ExecFormat = "{};;\n"
+	let g:incpy#HelpFormat = "#help {};;\n"
+<
+Node~
+
+The following example is for Node. It is incredibly simplified in that
+it only strips encompassing whitespace and does not provide too much
+else in terms of friendliness.
+>
+	let g:incpy#Program = '/path/to/node/js'
+
+	let g:incpy#Echo = 1
+	let g:incpy#EchoFormat = "{}\n"
+	let g:incpy#InputStrip = v:true
+	let g:incpy#OutputFollow = 1
+
+	let g:incpy#ExecFormat = "{}\n"
+	let g:incpy#EvalFormat = "{}\n"
+	let g:incpy#HelpFormat = "{}\n"
+<
+SWI-Prolog~
+
+The following example can be used with SWI Prolog. Executing selected text
+will have its terms expanded before `assertz()` is used to insert the code
+into the database. All evaluated expressions will trim any trailing `"."`
+characters.
+>
+	let g:incpy#Program = '/path/to/swipl'
+
+	let g:incpy#WindowOptions = {'filetype': 'prolog'}
+	let g:incpy#Echo = v:true
+	let g:incpy#EchoFormat = '%%% {}'
+	let g:incpy#EchoNewline = "{}\n"
+
+	let g:incpy#HelpFormat = "listing(({})).\n"
+
+	let g:incpy#EvalFormat = "{}.\n"
+	let _ = printf("trim(v:val, \".,%s\", 2)", '\r\n')
+	let g:incpy#EvalStrip = printf("trim(%s, \" %s\", 1)", _, '\r\n')
+
+	let _ =<< trim EOQ
+		expand_term(({0}), _Clauses),
+		(  is_list(_Clauses)
+		-> maplist(assertz, _Clauses)
+		;  assertz(({0}))
+		).
+	EOQ
+	let g:incpy#ExecFormat = printf("%s\n", join(_, ''))
+	let g:incpy#ExecStrip == "trim(v:val, '.,\n', 2)"
+
+	function! PL_InputStrip(lines)
+		function! PL_CollectStrips(accumulate, item) closure
+			if len(a:accumulate) == 0
+				return [a:item]
+			endif
+			let head = a:accumulate[-1]
+			let stripped = trim(head, " \n", 2)
+			if len(stripped) > 0
+			\	&& slice(stripped, -1) == '.'
+			\	&& count(stripped, '"') % 2 == 0
+			\	&& count(stripped, "'") % 2 == 0
+				return add(a:accumulate, a:item)
+			else
+				let rest = slice(a:accumulate, 0, -1)
+				return add(rest, head .. "\n" .. a:item)
+			endif
+		endfunction
+		let inputs = reduce(a:lines, funcref('PL_CollectStrips'), [])
+		return map(inputs, 'trim(v:val, " .\n", 2) .. "."')
+	endfunction
+
+	let g:incpy#InputStrip = function('PL_InputStrip')
+<
 ==============================================================================
 HISTORY
 
@@ -424,12 +699,12 @@ HISTORY
 ==============================================================================
 CREDITS
 
-    Thanks to Bram Moolenar and Vim's contributors for maintaining this
-    editor longer than I've been alive.
+    Thanks to |Bram-Moolenaar| and VIM's contributors for maintaining this
+    editor longer than I've been alive and continuing to maintain it forever.
 
-    Thanks to the maintainers of Emacs and SLIME (slime-mode) for inspiration.
-    Thanks to ccliver@gmail.org for much of his input on this plugin.
-    Thanks to Tim Pope <vimNOSPAM@tpope.info> for pointing out preview windows.
+    Thanks to the maintainers of |Emacs| and SLIME (slime-mode) for inspiration.
+    Thanks to <ccliver-at-gmail-org> for much of his input on this plugin.
+    Thanks to Tim Pope <vimNOSPAM-at-tpope-info> for pointing out preview windows.
 
 ==============================================================================
 Notes: some documentation worth referencing for writing help files in vim.
