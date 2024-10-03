@@ -2,7 +2,28 @@
 Author:		Ali Rizvi-Santiago <arizvisa-at-gmail-com>
 
 ==============================================================================
-INTRODUCTION								*incpy*
+CONTENTS						*incpy-contents*
+
+	1. Introduction				|incpy-intro|
+	2. Usage				|incpy-usage|
+	3. Interpreters				|incpy-interpreters|
+	4. Configuration			|incpy-configuration|
+	4.1. Configuration (External)		|incpy-configuration-external|
+	5. Commands				|incpy-commands|
+	6. Public API				|incpy-functions|
+	7. Configuration Examples		|incpy-examples|
+	7.1 Example - Python			|incpy-examples-python|
+	7.2 Example - Perl			|incpy-examples-perl|
+	7.3 Example - Bash			|incpy-examples-bash|
+	7.4 Example - F#			|incpy-examples-fsharp|
+	7.5 Example - Node			|incpy-examples-nodejs|
+	7.6 Example - SWI-Prolog		|incpy-examples-prolog|
+	8. Development and Bugs			|incpy-bugs|
+	9. History				|incpy-history|
+	10. Credits				|incpy-credits|
+
+==============================================================================
+INTRODUCTION							*incpy-intro*
 
 This plugin provides wrappers around buffers and windows in order to
 facilitate immediate interaction with another process of some sort. Typically
@@ -93,7 +114,7 @@ need to be provided. This involves specifying alternative values for the
 global variables: |g:incpy#InputStrip|, |g:incpy#ExecFormat|, |g:incpy#ExecStrip|,
 |g:incpy#EvalFormat|, and |g:incpy#EvalStrip|. For more details on this, please
 review the |incpy-configuration| section. Some examples can also be found in
-the |incpy-configuration-examples| section.
+the |incpy-examples| section.
 
 ==============================================================================
 INTERPRETERS (TERMINAL)				*incpy-interpreters-terminal*
@@ -184,7 +205,7 @@ To accommodate the difference in syntax for various interpreters, these
 processes for stripping and formatting input text are configurable.
 
 For examples of configurations that might be used for different programs,
-please see the |incpy-configuration-examples| section.
+please see the |incpy-examples| section.
 
 Stripping of input text~
 					*incpy-configuration-stripping*
@@ -204,7 +225,8 @@ transmitting it.
 Variables used for stripping input text~
 						*incpy-variables-stripping*
 The following variables are available for configuring how input text
-should be stripped:
+should be stripped. For details on what the types of these parameters
+mean, please review the |incpy-configuration-stripping| section.
 
 :let *g:incpy#InputStrip* = (|Boolean|, |String|, or |Funcref|}
 	This variable describes how text being passed transparently to
@@ -223,8 +245,8 @@ Formatting of input text~
 Depending on the interpreter, the input text may need to be specially
 formatted in order to differentiate evaluation from execution. The
 configuration variables for formatting input text are all specified as a
-|String| and follows the syntax that is based the `help(FORMATTING)` page found
-inside the |Python| documentation.
+|String| and follows the syntax that is based the `help(FORMATTING)` page
+found inside the |Python| documentation.
 
 An example format string for using an expression with the `help()` command
 in |Python| could be:
@@ -240,7 +262,8 @@ Variables used for Formatting input text~
 As prior mentioned, each formatting variable takes a |String| containing the
 desired format specification. Each of the following variables can be
 configured to specify how input text is to be formatted before sending to
-the interpreter:
+the interpreter. For details on how input is formatted, please review the
+|incpy-configuration-formatting| section.
 						*incpy-variables-formatting*
 :let *g:incpy#ExecFormat* = {formatspec}
 	This variable is used to format single or multiple lines that are
@@ -358,7 +381,7 @@ can be called directly.
 	View the |Python| help for the currently selected text.
 
 ==============================================================================
-PUBLIC API						*incpy-functions-public*
+PUBLIC API						*incpy-functions*
 
 This plugin provides a number of functions to the user which can be used
 to customize or script the interaction with their interpreter.
@@ -462,13 +485,14 @@ incpy#SetupInterpreterView({package})
 	as its scope.
 
 ==============================================================================
-CONFIGURATION (EXAMPLES)			*incpy-configuration-examples*
+CONFIGURATION (EXAMPLES)				*incpy-examples*
 
 This section lists a number of example configurations that might be used by
 any of the interpreters available on a system. It is recommended that the
 user match (|expr-=~|) against the value for |g:incpy#Program| in order to
 determine which configuration settings to use.
 
+							*incpy-examples-python*
 Python~
 
 The first example configuration is for an external |Python| interpreter. Most
@@ -502,6 +526,7 @@ for emitting the result of an expression.
 	\	'__import__("builtins").help',
 	\)
 <
+							*incpy-examples-perl*
 Perl~
 
 The following is a basic example demonstrating configuration for the |Perl|
@@ -523,6 +548,7 @@ without providing much in terms of user-friendliness.
 	let g:incpy#EvalFormat = "{}\n"
 	let g:incpy#HelpFormat = ":help {}\n"
 <
+							*incpy-examples-bash*
 Bash~
 
 The following is a basic example for the GNU Bourne-Again Shell. It
@@ -540,6 +566,7 @@ logon shell, but doesn't do too much else.
 	let g:incpy#EvalFormat = "echo \"${}\"\n"
 	let g:incpy#HelpFormat = "help {}\n"
 <
+							*incpy-examples-fsharp*
 F#~
 
 The following is a very minimal configuration for the FSharp programming
@@ -564,6 +591,7 @@ and provides only basic support for displaying the help for the language.
 	let g:incpy#ExecFormat = "{};;\n"
 	let g:incpy#HelpFormat = "#help {};;\n"
 <
+							*incpy-examples-nodejs*
 Node~
 
 The following example is for Node. It is incredibly simplified in that
@@ -581,6 +609,7 @@ else in terms of friendliness.
 	let g:incpy#EvalFormat = "{}\n"
 	let g:incpy#HelpFormat = "{}\n"
 <
+							*incpy-examples-prolog*
 SWI-Prolog~
 
 The following example can be used with SWI Prolog. Executing selected text
@@ -635,10 +664,19 @@ characters.
 	let g:incpy#InputStrip = function('PL_InputStrip')
 <
 ==============================================================================
+DEVELOPMENT AND BUGS					*incpy-bugs*
+
+The latest version of this plugin can always be found on GitHub at the url,
+https://github.com/arizvisa/vim-incpy. Please report any discovered issues
+to https://github.com/arizvisa/vim-incpy/issues if you want them fixed.
+
+Contributions and feature requests are also welcome.
+
+==============================================================================
 HISTORY							*incpy-history*
 
     v24:    Oct, 2024   Rewrote the window management so that it uses an
-                        identifier rather than tab and window number. Adder
+                        identifier rather than tab and window number. Added
                         this documentation...after all this time.
     v23:    Jul, 2024   Refactored the plugin layout so that the python
                         logic is better isolated from the vimscript logic.
