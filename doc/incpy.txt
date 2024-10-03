@@ -716,3 +716,5 @@ CREDITS							*incpy-credits*
     Thanks to the maintainers of |Emacs| and SLIME (slime-mode) for inspiration.
     Thanks to <ccliver-at-gmail-com> for much of his input on this plugin.
     Thanks to Tim Pope <vimNOSPAM-at-tpope-info> for pointing out preview windows.
+
+ vim:tw=78:ts=8:sw=8:noet:ft=help:norl:
