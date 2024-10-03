@@ -8,7 +8,7 @@ This plugin provides wrappers around buffers and windows in order to
 facilitate immediate interaction with another process of some sort. Typically
 the other process will be an interpreter, but any process that exchanges data
 within standard input, standard output, or standard error can be used. If no
-process is configured, the plugin will use the internal python interpreter
+process is configured, the plugin will use the internal |Python| interpreter
 for the interaction.
 
 The plugin requires the editor to be compiled with either |+python| or
@@ -20,7 +20,7 @@ is not supported by the editor, the plugin will capture all input and output
 from the target process into a regular buffer.
 
 Once the plugin has been loaded, any output from the external process or
-internal python interpreter will be captured in an output buffer for viewing
+internal |Python| interpreter will be captured in an output buffer for viewing
 and editing. Various commands are also available to send input to the target
 process for either execution or evaluation. These commands are mapped by
 default to key combinations in order to simplify the transmission of code
@@ -48,7 +48,7 @@ The following keybindings are mapped to normal and visual mode:
 								*CTRL-@*
 	<C-@>		Display the help for the word under the cursor.
 
-By default, the plugin will use the internal python interpreter compiled
+By default, the plugin will use the internal |Python| interpreter compiled
 into the editor. Through configuration, however, any command that reads
 from stdin and writes to stdout can be used. Depending on the interpreter,
 there may be extra configuration needed in order format the code being
@@ -68,7 +68,7 @@ it and can prepare the environment prior to user interaction.
 ==============================================================================
 INTERPRETERS (INTERNAL)				*incpy-interpreters-internal*
 
-This interpreter utilizes the internal python interpreter that comes compiled
+This interpreter utilizes the internal |Python| interpreter that comes compiled
 within the editor. If the plugin has not been configured, the default options
 will result in this interpreter being chosen. This interpreter does not
 display any version information, and is initialized with whatever the editor
@@ -87,7 +87,7 @@ its output to present to the user. This interpreter can be chosen by
 configuring the |g:incpy#Program| global variable with the path and parameters
 to start the desired process.
 
-It is worth noting that if using a non-python interpreter, configuration for
+It is worth noting that if using a non-Python interpreter, configuration for
 how text should be formatted when being submitted to the target process will
 need to be provided. This involves specifying alternative values for the
 global variables: |g:incpy#InputStrip|, |g:incpy#ExecFormat|, |g:incpy#ExecStrip|,
@@ -104,15 +104,15 @@ process outside the editor, and is configured by specifying a program via the
 the editor has been compiled with the |+terminal| feature.
 
 The only difference between this and the external interpreter is that this
-interpreter creates its process using the terminal api provided by the
-editor. The terminal api provides a 'terminal' buffer type which is more
+interpreter creates its process using the terminal API provided by the
+editor. The terminal API provides a 'terminal' buffer type which is more
 familiar to the user as opposed to regular buffer which is editable.
 
 ==============================================================================
 CONFIGURATION						*incpy-configuration*
 
 There are a number of options that are available for the user to configure
-this plugin. Generally, these options can be specified in the user's vimrc
+this plugin. Generally, these options can be specified in the user's |vimrc|
 which is loaded upon starting the editor.
 
 The first set of options is responsible for customizing how the window is
@@ -162,7 +162,7 @@ to be presented to the user. These options are as follows:
 	run as the interpreter. This will switch the interpreter being used
 	from |incpy-interpreter-internal| to |incpy-interpreter-external| or
 	|incpy-interpreter-terminal|. By default this will be empty which
-	will result in the internal python interpreter being used.
+	will result in the internal |Python| interpreter being used.
 
 :let *g:incpy#PythonStartup* = (|String|)
 	This global variable specifies the path of a dotfile to use for
@@ -173,7 +173,7 @@ to be presented to the user. These options are as follows:
 ==============================================================================
 CONFIGURATION (EXTERNAL)			*incpy-configuration-external*
 
-By default the configuration is designed for transmitting code to a |python|
+By default the configuration is designed for transmitting code to a |Python|
 interpreter. This is done by formatting the text to remove any unnecessary
 whitespace, and then formatting that result depending on whether it is to
 be evaluation as an expression or executed in the target interpreter as-is.
@@ -190,15 +190,16 @@ Stripping of input text~
 					*incpy-configuration-stripping*
 The configuration options for stripping the input text can take either a
 |Boolean|, |String|, or |Funcref| value. If a |Boolean| is specified, the input
-will have all of its encompassing whitespace trimmed. If a |String| is
-used, then it will be used with the |map()| function to transform the
-input. If a |FuncRef| is used, it will be called with the input text
-passed as its only parameter. The string that is returned by this
-function will then be passed to the interpreter.
+will have all of its encompassing white-space trimmed. If a |String| is
+used, then each line of the string will be used with the |map()| function
+to transform the input. If a |FuncRef| is used, it will be called with each
+line of the input text passed as a list for its parameter. The string
+that is returned by this function will then be passed to the interpreter.
 
-If the |python| interpreter for the editor is being used, the default
-process for stripping |python| code will result in stripping any
-indentation found at the beginning of the transmitted code.
+If the |Python| interpreter for the editor is being used, the default
+process for stripping |Python| code will result in stripping any
+indentation found at the beginning of the transmitted code before
+transmitting it.
 
 Variables used for stripping input text~
 						*incpy-variables-stripping*
@@ -223,10 +224,10 @@ Depending on the interpreter, the input text may need to be specially
 formatted in order to differentiate evaluation from execution. The
 configuration variables for formatting input text are all specified as a
 |String| and follows the syntax that is based the `help(FORMATTING)` page found
-inside the the |python| documentation.
+inside the |Python| documentation.
 
-An example format string for using an expression with the with the `help()`
-python command could be:
+An example format string for using an expression with the `help()` command
+in |Python| could be:
 >
 	:let g:incpy#EvalFormat = "help({})\n"
 <
@@ -243,15 +244,15 @@ the interpreter:
 						*incpy-variables-formatting*
 :let *g:incpy#ExecFormat* = {formatspec}
 	This variable is used to format single or multiple lines that are
-	to be executed. An example format that may be used with |python|
-	can be as follows:
+	to be executed. The following is an example format that can be used
+	with the |Python| interpreter:
 >
 	:let g:incpy#ExecFormat = "{}\n"
 <
 :let *g:incpy#EvalFormat* = {formatspec}
 	This variable is used to format an expression composed of a
-	single or multiple lines before being passed to the interpeter.
-	An example format that may be used with |python| can be:
+	single or multiple lines before being passed to the interpreter.
+	An example format that may be used with |Python| can be:
 >
 	:let g:incpy#EvalFormat = "print(({}))\n"
 <
@@ -270,11 +271,11 @@ the interpreter:
 
 :let *g:incpy#HelpFormat* = {formatspec}
 	This variable is used to format text into an expression that will
-	display the `help()` for it. This is specific to |python|, but can be
+	display the `help()` for it. This is specific to |Python|, but can be
 	used with other languages that allow using a keyword to view the
 	documentation.
 
-	An example format string that can be used with |python| is:
+	An example format string that can be used with |Python| is:
 >
 	:let g:incpy#EvalFormat = "help(({}))\n"
 <
@@ -300,14 +301,14 @@ here in case the user wishes to tinker with them.
 :let *g:incpy#PackageName* = |string|
 	This variable is internal and contains a string that is used to
 	isolate the implementation of this plugin. It is the name of the
-	python module that is used as a scope when executing plugin-related
+	|Python| module that is used as a scope when executing plugin-related
 	functionality. By default this is configured as `"__incpy__"`.
 
 :let *g:incpy#Greenlets* = |Boolean|
 	This customizes the method that the |incpy-interpreters-external|
 	interpreter uses to write asynchronously into its output buffer.
 	This is chosen by default based on whether the 'gevent' module is
-	actually importable in the |python| interpreter used by the editor.
+	actually importable in the |Python| interpreter used by the editor.
 
 ==============================================================================
 COMMANDS						*incpy-commands*
@@ -351,10 +352,10 @@ can be called directly.
 	Evaluate the currently selected code within the interpreter.
 							*:PyHelp*
 :PyHelp {string}
-	View the python help for the expression specified as a string.
+	View the |Python| help for the expression specified as a string.
 							*:PyHelpSelection*
 :PyHelpSelection
-	View the python help for the currently selected text.
+	View the |Python| help for the currently selected text.
 
 ==============================================================================
 PUBLIC API						*incpy-functions-public*
@@ -442,7 +443,7 @@ incpy#SetupOptions()
 	Initialize the default |incpy-configuration| for the plugin.
 						*incpy#SetupPythonLoader()*
 incpy#SetupPythonLoader({package}, {currentscriptpath})
-	Set up the entire python loader for the plugin using the
+	Set up the entire |Python| loader for the plugin using the
 	files relative to {currentscriptpath} with the specified
 	{package} name.
 						*incpy#SetupPackageLoader()*
@@ -470,10 +471,10 @@ determine which configuration settings to use.
 
 Python~
 
-The first example configuration is for an external |python| interpreter. Most
+The first example configuration is for an external |Python| interpreter. Most
 of its stripping and formatting comes with the plugin by default. This
 example steals some of its options from the plugin in order to disable the
-pager for `help()` and to use the same method the |python| interpreter uses
+pager for `help()` and to use the same method the |Python| interpreter uses
 for emitting the result of an expression.
 >
 	let g:incpy#Program = '/usr/bin/env python -i'
@@ -503,19 +504,29 @@ for emitting the result of an expression.
 <
 Perl~
 
-The following is a basic example demonstrating configuration for the perl
-interpreter. It is incredibly basic and does not provide much.
+The following is a basic example demonstrating configuration for the |Perl|
+interpreter. This uses the `Shell::Perl` CPAN module and is incredibly basic
+without providing much in terms of user-friendliness.
 >
-	let g:incpy#Program = '/usr/bin/env perl'
-	let g:incpy#WindowOptions = {"filetype": "perl"}
-	let g:incpy#Echo = 1
-	let g:incpy#EchoFormat = "> $ {}"
-	let g:incpy#HelpFormat = "{}\n"
+	let g:incpy#Program =<< trim END
+		perl -MShell::Perl -e Shell::Perl::run_with_args"
+	END
+
+	let g:incpy#WindowOptions = {'filetype': 'perl'}
+
+	function! Perl_SingleLine(value)
+		return join(a:value, ';')
+	endfunction
+
+	let g:incpy#InputStrip = function('Perl_SingleLine')
+	let g:incpy#ExecFormat = "{}\n"
+	let g:incpy#EvalFormat = "{}\n"
+	let g:incpy#HelpFormat = ":help {}\n"
 <
 Bash~
 
 The following is a basic example for the GNU Bourne-Again Shell. It
-sets the parameters to ensure that the started shell is an interfactive
+sets the parameters to ensure that the started shell is an interactive
 logon shell, but doesn't do too much else.
 >
 	let g:incpy#Program = "/usr/bin/env bash -il"
@@ -532,7 +543,7 @@ logon shell, but doesn't do too much else.
 F#~
 
 The following is a very minimal configuration for the FSharp programming
-language. It disables colors and readline support using the command line,
+language. It disables colors and 'readline' support using the command line,
 and provides only basic support for displaying the help for the language.
 >
 	let g:incpy#Program = join([
@@ -556,7 +567,7 @@ and provides only basic support for displaying the help for the language.
 Node~
 
 The following example is for Node. It is incredibly simplified in that
-it only strips encompassing whitespace and does not provide too much
+it only strips encompassing white-space and does not provide too much
 else in terms of friendliness.
 >
 	let g:incpy#Program = '/path/to/node/js'
@@ -624,7 +635,7 @@ characters.
 	let g:incpy#InputStrip = function('PL_InputStrip')
 <
 ==============================================================================
-HISTORY
+HISTORY							*incpy-history*
 
     v24:    Oct, 2024   Rewrote the window management so that it uses an
                         identifier rather than tab and window number. Adder
@@ -697,7 +708,7 @@ HISTORY
                         (slime-mode) now at https://slime.common-lisp.dev.
 
 ==============================================================================
-CREDITS
+CREDITS							*incpy-credits*
 
     Thanks to |Bram-Moolenaar| and VIM's contributors for maintaining this
     editor longer than I've been alive and continuing to maintain it forever.
@@ -705,9 +716,3 @@ CREDITS
     Thanks to the maintainers of |Emacs| and SLIME (slime-mode) for inspiration.
     Thanks to <ccliver-at-gmail-com> for much of his input on this plugin.
     Thanks to Tim Pope <vimNOSPAM-at-tpope-info> for pointing out preview windows.
-
-==============================================================================
-Notes: some documentation worth referencing for writing help files in vim.
-	|help-writing|
-	|write-local-help|
-	|add-local-help|
