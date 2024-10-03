@@ -703,7 +703,7 @@ CREDITS
     editor longer than I've been alive and continuing to maintain it forever.
 
     Thanks to the maintainers of |Emacs| and SLIME (slime-mode) for inspiration.
-    Thanks to <ccliver-at-gmail-org> for much of his input on this plugin.
+    Thanks to <ccliver-at-gmail-com> for much of his input on this plugin.
     Thanks to Tim Pope <vimNOSPAM-at-tpope-info> for pointing out preview windows.
 
 ==============================================================================
