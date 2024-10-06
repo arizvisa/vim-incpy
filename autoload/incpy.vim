@@ -188,7 +188,7 @@ function! s:render_native_as_python(object)
         return printf('%d', a:object)
     elseif object_type == v:t_string
         return s:quote_single(a:object)
-    elseif object_type == v:t_none
+    elseif object_type is v:null
         return 'None'
     elseif object_type == v:t_float
         return printf('%f', a:object)
