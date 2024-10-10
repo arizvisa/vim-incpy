@@ -204,12 +204,27 @@ else:
         if hasattr(_vim, 'Function'):
             @classmethod
             def Function(cls, name):
+                '''Return a callable that executes the specified vim function.'''
+                return _vim.Function(name)
+
+            @classmethod
+            def FunctionWithResult(cls, name):
+                '''Return a callable that executes the specified vim function and returns its result.'''
                 return _vim.Function(name)
         else:
             @classmethod
             def Function(cls, name):
+                '''Return a callable that executes the specified vim function.'''
                 def caller(*args):
                     return cls.command("call {:s}({:s})".format(name, ','.join(map(cls._to, args))))
+                caller.__name__ = name
+                return caller
+
+            @classmethod
+            def FunctionWithResult(cls, name):
+                '''Return a callable that executes the specified vim function and returns its result.'''
+                def caller(*args):
+                    return cls.eval("{:s}({:s})".format(name, ','.join(map(cls._to, args))))
                 caller.__name__ = name
                 return caller
 
@@ -404,7 +419,7 @@ else:
             @classmethod
             def start(cls, cmd, **options):
                 '''Start the specified command as a terminal job and return the buffer number.'''
-                return vim.Function('term_start')(cmd, vim.Dictionary(options))
+                return vim.FunctionWithResult('term_start')(cmd, vim.Dictionary(options))
 
             @classmethod
             def stop(cls, buffer):
@@ -430,7 +445,7 @@ else:
             @classmethod
             def send(cls, buffer, keys):
                 '''Send the given keystrokes to the terminal job in the specified buffer.'''
-                return vim.Function('term_sendkeys')(buffer, keys)
+                return vim.FunctionWithResult('term_sendkeys')(buffer, keys)
 
             @classmethod
             def wait(cls, buffer, *timeout):
