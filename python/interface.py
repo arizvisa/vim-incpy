@@ -180,7 +180,7 @@ else:
         bvars, wvars, tvars, svars, vvars = map(_vars, 'bwtsv')
 
         # dictionary
-        if hasattr(_vim, 'Diictionary'):
+        if hasattr(_vim, 'Dictionary'):
             @classmethod
             def Dictionary(cls, dict):
                 return _vim.Dictionary(dict)
