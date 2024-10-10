@@ -339,7 +339,7 @@ function! s:generate_interpreter_cache_snippet(package)
 
         # grab the program specified by the user
         program = interface.vim.gvars["incpy#Program"]
-        use_terminal = interface.vim.eval('has("terminal")') and interface.vim.gvars["incpy#Terminal"]
+        use_terminal = interface.vim.has('terminal') and interface.vim.gvars["incpy#Terminal"]
 
         # figure out which interpreter to use and then instantiate it.
         try:

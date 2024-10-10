@@ -185,6 +185,11 @@ else:
             @classmethod
             def eval(cls, string): return cls._from(_vim.eval(string))
 
+        @classmethod
+        def has(cls, feature):
+            '''Return whether the editor supports the requested feature.'''
+            return cls.eval("has('{:s}')".format(feature.replace("'", "''")))
+
         # global variables
         if hasattr(_vim, 'vars'):
             gvars = _autofixdict(_vim.vars) if hasattr(_vim, 'Dictionary') and isinstance(_vim.vars, _vim.Dictionary) else _vim.vars
