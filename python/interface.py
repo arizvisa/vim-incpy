@@ -620,6 +620,7 @@ class buffer(object):
     def write(self, data):
         lines = iter(data.split('\n'))
         with vim.buffer.update(self.buffer) as buffer:
+            if not(len(buffer)): buffer[:] = ['']
             buffer[-1] += next(lines)
             [ buffer.append(item) for item in lines ]
         return
