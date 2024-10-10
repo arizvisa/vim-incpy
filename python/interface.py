@@ -576,6 +576,9 @@ else:
                 return lines
             raise ValueError(position)
 
+        # add a property that selects between the regular terminal class and the neovim flavor'd one.
+        terminal = _accessor(get=lambda terminal=terminal, neo=neoterminal: neo if vim.has('nvim') else terminal)
+
 class buffer(object):
     """vim buffer management"""
 
