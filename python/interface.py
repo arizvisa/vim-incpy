@@ -153,16 +153,22 @@ else:
         tabpages = _accessor(_vim.tabpages)
 
         # vim.command and evaluation (local + remote)
-        if (_vim.eval('has("clientserver")')) and False:
+        if _vim.eval('has("clientserver")'):
             @classmethod
-            def command(cls, string, count=16):
-                cmd, escape = string.replace("'", "''"), ''
-                return _vim.command("call remote_send(v:servername, \"{:s}:\" . '{:s}' . \"\n\")".format(count * escape, cmd))
+            def command(cls, string):
+                cmd, escape, exitmode = string.replace("'", "''"), '', ''
+                remote = "call remote_send(v:servername, \"{:s}\" . ':' . '{:s}' . \"{:s}\")".format(exitmode, cmd, r'\n')
+                return _vim.command(remote)
 
             @classmethod
             def eval(cls, string):
                 cmd = string.replace("'", "''")
-                return cls._from(_vim.eval("remote_expr(v:servername, '{:s}')".format(cmd)))
+                remote = "remote_expr(v:servername, '{:s}')".format(cmd)
+                serialized = _vim.eval(remote)
+                if '\n' in serialized:
+                    iterable = (cls._from(line) for line in serialized.split('\n') if line)
+                    return [item for item in iterable]
+                return cls._from(serialized)
 
         else:
             @classmethod
