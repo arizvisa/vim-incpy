@@ -341,16 +341,17 @@ function! s:generate_interpreter_cache_snippet(package)
 
         # grab the program specified by the user
         program = interface.vim.gvars["incpy#Program"]
-        use_terminal = (interface.vim.has('terminal') or interface.vim.has('nvim')) and interface.vim.gvars["incpy#Terminal"]
+        use_terminal = any(interface.vim.has(feature) for feature in ['terminal', 'nvim']) and interface.vim.gvars["incpy#Terminal"]
 
         # figure out which interpreter to use and then instantiate it.
         try:
-            if len(program) > 0:
-                interpreter = interpreters.terminal if use_terminal else interpreters.external
-                cache = interpreter(program)
+            if len(program) > 0 and use_terminal:
+                interpreter = interpreters.neoterminal if interface.vim.has('nvim') else interpreters.terminal
+            elif len(program) > 0:
+                interpreter = interpreters.external
             else:
                 interpreter = interpreters.internal
-                cache = interpreter()
+            cache = interpreter(*[program] if program else [])
 
         # if we couldn't start the interpreter, then fall back to an internal one
         except Exception:
