@@ -191,6 +191,9 @@ else:
                 rendered = [(Frender(key), Frender(value)) for key, value in dict.items() if isinstance(value, (string_types, integer_types))]
                 return cls.eval("{}{:s}{}".format('{', ','.join("{:s}:{:s}".format(*pair) for pair in rendered), '}'))
 
+        # buffers
+        Buffer = _accessor(_vim.Buffer if hasattr(_vim, 'Buffer') else _vim.current.buffer.__class__)
+
         # functions
         if hasattr(_vim, 'Function'):
             @classmethod
@@ -248,7 +251,7 @@ else:
             @classmethod
             def of(cls, identity):
                 '''Return the buffer number for the specified name, number, or buffer.'''
-                if isinstance(identity, _vim.Buffer):
+                if isinstance(identity, vim.Buffer):
                     return identity.number
 
                 # Grab the info using identity as a buffer number.
