@@ -153,7 +153,16 @@ else:
         tabpages = _accessor(_vim.tabpages)
 
         # vim.command and evaluation (local + remote)
-        if _vim.eval('has("clientserver")'):
+        if _vim.eval('has("clientserver")') and not 'enabled':
+
+            # FIXME: this is currently disabled because it exposes a race condition
+            #        when sending a command that adds a buffer. the issue is that when
+            #        using `remote_send(..., ":badd buf\n")`, the command will succeed,
+            #        but the `vim.buffers` list hasn't yet been updated. another symptom
+            #        is that using `remote_send(..., ":!ls\n") directly after the "badd"
+            #        will list the added buffer, but using `:ls!` (without a "remote_send")
+            #        will show that the buffer does not exist.
+
             @classmethod
             def command(cls, string):
                 cmd, escape, exitmode = string.replace("'", "''"), '', ''
