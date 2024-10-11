@@ -468,6 +468,98 @@ else:
                     raise vim.error("Unable to wait on the terminal job in buffer {:d} as it is not associated with a job.".format(buffer))
                 return vim.Function('term_wait')(buffer, *timeout)
 
+        class neoterminal(object):
+            """Internal neovim commands for interacting with terminal jobs by their buffer number"""
+            exists = staticmethod(lambda buffer: len(vim.eval("jobwait([{:d}], 0) != -3".format(buffer))) > 0)
+
+            # fortunately the &channel option seems to be immutable, so
+            # we can just query it from the buffer variables to extract it.
+            job = staticmethod(lambda buffer: vim.eval("getbufvar({:d}, '&channel')".format(buffer)))
+
+            @classmethod
+            def start(cls, cmd, **options):
+                '''Start the specified command as a terminal job and return the buffer number.'''
+                cwd = vim.eval("fnamemodify({:s}, ':~')".format('getcwd()'))
+                job = vim.eval("termopen({!r}, {!s})".format(cmd, options))
+
+                # XXX: we should be able to determine the buffer name from the `cwd`, `pid`, and
+                #      `cmd`, but (for some reason) "termopen" starts up multiple instances of the
+                #      neovim python provider when there are no writable buffers available for
+                #      replacement...or at least when neovim starts up..anyways.
+                #
+                #      somehow the aforementioned condition results in the wrong job id being
+                #      returned by our call to "termopen()". it is wrong in that it doesn't
+                #      correlate with the id from the "b:terminal_job_id" buffer variable. so,
+                #      when we use said job id to get the pid via "jobpid()", we get a completely
+                #      wrong process id. thus our entire predicted buffer name will be wrong.
+
+                #pid = vim.eval("jobpid({:d})".format(job))
+                #name = "term://{cwd}//{pid}:{command}".format(cwd=cwd, pid=pid, command=cmd)
+                #assert(vim.eval("bufexists('{:s}')".format(name.replace("'", "''"))))
+                #return vim.eval("bufnr('{:s}')".format(name.replace("'", "''")))
+
+                # we have no choice but to iterate through all of the buffers while
+                # trying to find the one where the '&channel' number matches our job.
+                infos = [info for info in vim.eval('getbufinfo()')]
+                filtered = [info for info in infos if 'terminal_job_id' in info.get('variables', {})]
+                matching = [info for info in filtered if info['variables']['terminal_job_id'] == job]
+
+                # now we just need to filter our matching results and return the buffer from them.
+                results = {info['bufnr'] for info in matching}
+                if len(results) != 1:
+                    raise vim.error("Unable to locate the buffer that is associated with job {:d}{:s}.".format(job, " ({:s})".format(', '.join(map("{:d}".format, results))) if results else ''))
+                elif not vim.eval("bufexists({:d})".format(*results)):
+                    raise vim.error("An error with the identified buffer ({:d}) for job {:d} has occurred as the buffer does not exist.".format(int(*results), job))
+                return int(*results)
+
+            @classmethod
+            def stop(cls, buffer):
+                '''Stop the terminal job running in the specified buffer.'''
+                if not cls.exists(buffer):
+                    raise vim.error("Unable to stop the job in buffer {:d} as it is not associated with a job.".format(buffer))
+                job = cls.job(buffer)
+                return vim.eval("jobstop({:d})".format(job))
+
+            @classmethod
+            def info(cls, buffer):
+                '''Return information for the terminal job in the specified buffer as a dictionary.'''
+                if not cls.exists(buffer):
+                    raise vim.error("Unable to get information for job in buffer {:d} as it is not associated with a job.".format(buffer))
+                job = cls.job(buffer)
+                pid = vim.eval("jobpid({:d})".format(job))
+                return {'process': pid}
+
+            @classmethod
+            def status(cls, buffer):
+                '''Return the status for the terminal job in the specified buffer as a string.'''
+                if not cls.exists(buffer):
+                    raise vim.error("Unable to get the status for job in buffer {:d} as it is not associated with a job.".format(buffer))
+                job = cls.job(buffer)
+                res = vim.eval("jobwait([{:d}], 0)".format(job))
+                if res == -1:
+                    return 'running'
+                return 'finished'
+
+            @classmethod
+            def send(cls, buffer, keys):
+                '''Send the given keystrokes to the terminal job in the specified buffer.'''
+                job = cls.job(buffer)
+
+                # neovim doesn't like us using newlines, so we need to give it
+                # a list if we want to send any keypresses that include them.
+                return vim.eval("chansend({:d}, {!r})".format(job, keys.split('\n')))
+
+            @classmethod
+            def wait(cls, buffer, *timeout):
+                '''Wait for any pending updates to the terminal job in the specified buffer.'''
+                if not cls.exists(buffer):
+                    raise vim.error("Unable to wait on the terminal job in buffer {:d} as it is not associated with a job.".format(buffer))
+
+                # there's no need to wait for things in neovim. apparently they
+                # assume that the buffer (window) will always be up-to-date. we
+                # still honor the sleep timeout, though, if we received one.
+                timeout and vim.eval("wait({:f}, {:s})".format(max(0, *timeout), 'v:false'))
+
         dimensions = _accessor(get=lambda: tuple(int(vim.eval('&' + option)) for option in ['columns', 'lines']))
         width = _accessor(get=lambda: int(vim.eval('&columns')))
         height = _accessor(get=lambda: int(vim.eval('&lines')))
@@ -483,6 +575,9 @@ else:
             if position in {'above', 'below'}:
                 return lines
             raise ValueError(position)
+
+        # add a property that selects between the regular terminal class and the neovim flavor'd one.
+        terminal = _accessor(get=lambda terminal=terminal, neo=neoterminal: neo if vim.has('nvim') else terminal)
 
 class buffer(object):
     """vim buffer management"""
@@ -525,6 +620,7 @@ class buffer(object):
     def write(self, data):
         lines = iter(data.split('\n'))
         with vim.buffer.update(self.buffer) as buffer:
+            if not(len(buffer)): buffer[:] = ['']
             buffer[-1] += next(lines)
             [ buffer.append(item) for item in lines ]
         return

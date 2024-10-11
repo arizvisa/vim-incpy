@@ -401,7 +401,7 @@ function! incpy#SetupOptions()
     let defopts["WindowStartup"] = v:true
 
     let defopts["Greenlets"] = v:false
-    let defopts["Terminal"] = has('terminal')
+    let defopts["Terminal"] = has('terminal') || has('nvim')
 
     let python_builtins = printf("__import__(%s)", s:quote_double('builtins'))
     let python_pydoc = printf("__import__(%s)", s:quote_double('pydoc'))
@@ -425,7 +425,9 @@ function! incpy#SetupOptions()
     endif
 
     " Default window options that the user will override
-    let defopts["CoreWindowOptions"] = {"buftype": has("terminal")? "terminal" : "nowrite", "swapfile": v:false, "updatecount":0, "buflisted": v:false}
+    let neo_window_options = {'buftype': 'nofile', 'swapfile': v:false, 'updatecount':0, 'buflisted': v:false}
+    let core_window_options = {'buftype': has('terminal')? 'terminal' : 'nowrite', 'swapfile': v:false, 'updatecount':0, 'buflisted': v:false}
+    let defopts["CoreWindowOptions"] = has('nvim')? neo_window_options : core_window_options
 
     " If any of these options aren't defined during evaluation, then go through and assign them as defaults
     for o in keys(defopts)
@@ -458,7 +460,7 @@ function! incpy#SetupPythonInterpreter(package)
 
     " Otherwise, we only need to warn the user about using it if they're
     " trying to run an external program without having the terminal api.
-    elseif len(g:incpy#Program) > 0 && !has("terminal")
+    elseif len(g:incpy#Program) > 0 && !(has('terminal') || has('nvim'))
         echohl WarningMsg | echomsg printf('WARNING:%s:Using plugin to run an external program without support for greenlets could be unstable', g:incpy#PluginName) | echohl None
     endif
 

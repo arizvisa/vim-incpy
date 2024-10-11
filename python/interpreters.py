@@ -402,3 +402,59 @@ class terminal(interpreter_with_view):
 
         self.logger.info("Successfully terminated job {:d} ({:#x}) in buffer {:d} for {:s}.".format(pid, pid, self.buffer, '.'.join([getattr(cls, '__module__', __name__), cls.__name__])))
         return True
+
+class neoterminal(terminal):
+    """
+    This interpreter is responsible for spawning an arbitrary
+    process as a terminal job in the neovim editor. Specifically,
+    the "termopen()" function replaces the _current_ buffer with
+    the terminal. That buffer must also be unmodified for things
+    to work. So, we inherit from the original `terminal` class and
+    ensure that we create an empty buffer before starting things.
+    """
+
+    def start(self, name=''):
+        '''Start the process associated with the terminal interpreter in a new buffer with the specified name.'''
+        old = vim.window.current()
+
+        # in neovim, the documentation for "termopen" notes that it will connect the
+        # new pty-session to the _current_ buffer. the buffer is also required to be
+        # unmodified. so, to accommodate neovim, we create an empty buffer immediately.
+        bname = name or vim.gvars['incpy#WindowName']
+        number = vim.eval("bufadd('{:s}')".format(bname.replace("'", "''")))
+
+        # now we need open a window for the buffer and put it in focus in order
+        # for it to be considered the "current buffer". we use a preview window
+        # because it is easy to close since we don't need to know the window id.
+        if vim.gvars['incpy#WindowPreview']:
+            vim.command("noautocmd silent pedit! #{:d} | wincmd P".format(number))
+        else:
+            vim.command("noautocmd silent split! #{:d}".format(number))
+        window = vim.window.current()
+        preview = vim.window.type(window) == 'preview'
+
+        # the new window should be in focus with the scratch buffer. we should
+        # be okay to start the terminal process without replacing a buffer that
+        # the user is currently editing.
+        options = {key : value for key, value in self.command_options.items()}
+        buffer = vim.terminal.start(self.command, **options)
+
+        # now we have the buffer number for the job and can hand it to our super.
+        view = super(terminal, self).start(buffer)
+
+        # finally we select the window that was originally in focus, and then
+        # close the window so the caller can be responsible for view management.
+        vim.window.select(window)
+        vim.command("noautocmd silent {:s}close!".format('p' if preview else ''))
+        vim.window.select(old)
+        return True
+
+    def show(self, position, ratio_or_size, *options, **kwoptions):
+        '''Show a window to the neovim interpreter at the specified position with the given ratio or size.'''
+        kwoptions.pop('buftype', None)
+
+        # XXX: neovim doesn't let you set the "buftype" option on a "terminal"
+        #      window. so, we need to filter it from the options we were given.
+        iterable = ((arg, arg.pop('buftype', None)) for arg in options)
+        filtered = [arg for arg, _ in iterable]
+        return super(neoterminal, self).show(position, ratio_or_size, *filtered, **kwoptions)
