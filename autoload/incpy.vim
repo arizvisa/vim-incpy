@@ -227,8 +227,8 @@ function! s:execute_python_in_workspace(package, command)
 
     " Guard whatever it is we were asked to execute by
     " ensuring that our module workspace has been loaded.
-    execute printf("pythonx __builtins__.__import__(%s).exec_", s:quote_single(a:package))
-    execute printf("pythonx __builtins__.__import__(%s)", s:quote_single(l:workspace_module))
+    execute printf("pythonx (__builtins__ if isinstance(__builtins__, {}.__class__) else __builtins__.__dict__)['__import__'](%s).exec_", s:quote_single(a:package))
+    execute printf("pythonx (__builtins__ if isinstance(__builtins__, {}.__class__) else __builtins__.__dict__)['__import__'](%s)", s:quote_single(l:workspace_module))
 
     " If our command contains 3x single or double-quotes, then
     " we format our strings with the one that isn't used.
@@ -240,8 +240,9 @@ function! s:execute_python_in_workspace(package, command)
 
     " Now we need to render our multilined list of commands to
     " a multilined string, and then execute it in our workspace.
-    let l:python_execute = join(['__builtins__', printf("__import__(%s)", s:quote_single(a:package)), 'exec_'], '.')
-    let l:python_workspace = join(['__builtins__', printf("__import__(%s)", s:quote_single(l:workspace_module)), 'workspace', '__dict__'], '.')
+    let l:because_neovim = printf('(__builtins__ if isinstance(__builtins__, {}.__class__) else __builtins__.__dict__)[%s]', s:quote_single('__import__'))
+    let l:python_execute = join([printf("%s(%s)", l:because_neovim, s:quote_single(a:package)), 'exec_'], '.')
+    let l:python_workspace = join([printf("%s(%s)", l:because_neovim, s:quote_single(l:workspace_module)), 'workspace', '__dict__'], '.')
 
     execute printf("pythonx (lambda F, ns: (lambda s: F(s, ns, ns)))(%s, %s)(%s)", l:python_execute, l:python_workspace, strings)
 endfunction
@@ -335,7 +336,7 @@ endfunction
 function! s:generate_interpreter_cache_snippet(package)
 
     let install_interpreter =<< trim EOC
-        __import__, package_name = __builtins__['__import__'], %s
+        __import__, package_name = (__builtins__ if isinstance(__builtins__, {}.__class__) else __builtins__.__dict__)['__import__'], %s
         package = __import__(package_name)
         interface, interpreters = (getattr(__import__('.'.join([package.__name__, module])), module) for module in ['interface', 'interpreters'])
 
@@ -370,7 +371,7 @@ endfunction
 function! s:generate_interpreter_view_snippet(package)
 
     let create_view =<< trim EOC
-        __import__, package_name = __builtins__['__import__'], %s
+        __import__, package_name = (__builtins__ if isinstance(__builtins__, {}.__class__) else __builtins__.__dict__)['__import__'], %s
         package = __import__(package_name)
         [interface] = (getattr(__import__('.'.join([package.__name__, module])), module) for module in ['interface'])
 
