@@ -513,6 +513,16 @@ function! incpy#SetupKeys()
     " Normal and visual mode mappings for everything else
     nnoremap <C-S-@> :call incpy#Halp(<SID>keyword_under_cursor())<C-M>
     vnoremap <C-S-@> :PyHelpSelection<C-M>
+
+    " If we have terminal support, then add a mapping that makes
+    " pasting from a register similar to cmdline-mode.
+    if has('terminal')
+        tnoremap <C-R> <C-W>"
+    elseif has('nvim')
+        "tnoremap <expr> <C-R> '<C-\><C-o>"'.nr2char(getchar()).'p'
+        tnoremap <C-R>= <Cmd>call chansend(b:terminal_job_id, eval(input('=')))<CR>
+        tnoremap <C-R> <Cmd>call chansend(b:terminal_job_id, getreg(nr2char(getchar())))<CR>
+    endif
 endfunction
 
 " Check to see if a python site-user dotfile exists in the users home-directory.
