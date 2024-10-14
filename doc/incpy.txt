@@ -391,10 +391,12 @@ can be called directly.
 	using the |incpy#EvaluateSelected| function.
 							*:PyHelp*
 :PyHelp {string}
-	View the |Python| help for the expression specified as a string.
+	View the |Python| help for the expression specified as a string. This
+	uses the |incpy#Halp| public function for its implementation.
 							*:PyHelpSelection*
 :PyHelpSelection
-	View the |Python| help for the currently selected text.
+	View the |Python| help for the currently selected text. This uses the
+	|incpy#HalpSelected| public function for its implementation.
 
 ==============================================================================
 PUBLIC API						*incpy-functions*
@@ -473,10 +475,13 @@ incpy#EvaluateSelected() range
 							*incpy#Halp()*
 incpy#Halp({expr})
 	View the help for the expression specified as a string within
-	the interpreter.
+	the interpreter. This function is specific to python and is formatted
+	by the contents of the |g:incpy#HelpFormat| variable.
 							*incpy#HalpSelected()*
 incpy#HalpSelected() range
-	View the help for the current selection within the interpreter.
+	View the help for the current selection within the interpreter. This
+	function is specific to python and formatted by the contents of the
+	|g:incpy#HelpFormat| variable.
 
 ==============================================================================
 PRIVATE (INTERNAL)				*incpy-functions-private*
