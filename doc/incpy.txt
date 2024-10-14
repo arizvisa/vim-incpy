@@ -573,6 +573,13 @@ for emitting the result of an expression.
 	\	'__import__("builtins").help',
 	\)
 <
+It is probably worth noting that a key can be mapped with the |:Py| command,
+|bufname()|, and |fnamemodify()| to re-exec the current file within the
+interpreter and keep the interpreter state synchronized with the file being
+edited.
+>
+	nmap <key> <Cmd>execute printf("Py execfile('%s')\n", bufname(''))<CR>
+<
 							*incpy-examples-perl*
 Perl~
 
@@ -709,6 +716,12 @@ characters.
 	endfunction
 
 	let g:incpy#InputStrip = function('PL_InputStrip')
+<
+It is probably worth noting that a key can be mapped with |incpy#ExecuteRaw|,
+|bufname()|, and |fnamemodify()| to utilize the bracket notation for
+re-consulting the current file.
+>
+    nmap <key> <Cmd>execute printf("PyRaw ['%s'].\n", bufname(''))<CR>
 <
 ==============================================================================
 DEVELOPMENT AND BUGS					*incpy-bugs*
