@@ -347,37 +347,48 @@ current interpreter. As per the capabilities of the editor, these commands
 can be called directly.
 							*:Py*
 :Py {string}
-	Execute the specified string within the interpreter.
+	Execute the specified string within the interpreter using the
+	|incpy#Execute| function.
 							*:PyLine*
 :PyLine
-	Execute the current lines within the interpreter
+	Execute the current lines within the interpreter using the
+	|incpy#Range| function.
 							*:PyRange*
 :PyRange
-	Send the specified range to the interpreter.
+	Send the specified range to the interpreter using the
+	|incpy#Range| function.
 							*:PyBuffer*
 :PyBuffer
-	Execute the contents of the entire buffer within the interpreter.
+	Execute the contents of the entire buffer within the interpreter
+	using the |incpy#Range| function.
 							*:PyExecuteRange*
 :PyExecuteRange
-	Execute the specified range within the current interpreter.
+	Execute the specified range within the current interpreter using
+	the |incpy#ExecuteRange| function.
 							*:PyExecuteBlock*
 :PyExecuteBlock
-	Execute the currently selected block within the current interpreter.
+	Execute the currently selected block within the current interpreter
+	using the |incpy#ExecuteBlock| function.
 							*:PyExecuteSelection*
 :PyExecuteSelection
-	Execute the selected code within the interpreter.
+	Execute the selected code within the interpreter using the
+	|incpy#ExecuteSelected| function.
 							*:PyEval*
 :PyEval {string}
-	Evaluate the expression specified as a string.
+	Evaluate the expression specified as a string using the public
+	|incpy#Evaluate| function.
 							*:PyEvalRange*
 :PyEvalRange
-	Evaluate the specified range within the current interpreter.
+	Evaluate the specified range within the current interpreter
+	using the |incpy#EvaluateRange| function.
 							*:PyEvalBlock*
 :PyEvalBlock
-	Evaluate the currently selected block within the interpreter.
+	Evaluate the currently selected block within the interpreter
+	using the |incpy#EvaluateBlock| function.
 							*:PyEvalSelection*
 :PyEvalSelection
-	Evaluate the currently selected code within the interpreter.
+	Evaluate the currently selected code within the interpreter
+	using the |incpy#EvaluateSelected| function.
 							*:PyHelp*
 :PyHelp {string}
 	View the |Python| help for the expression specified as a string.
