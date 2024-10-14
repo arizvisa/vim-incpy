@@ -426,6 +426,7 @@ class neoterminal(terminal):
         # now we need open a window for the buffer and put it in focus in order
         # for it to be considered the "current buffer". we use a preview window
         # because it is easy to close since we don't need to know the window id.
+        # this is an alternative to the workaround for issue neovim/neovim#30765.
         if vim.gvars['incpy#WindowPreview']:
             vim.command("noautocmd silent pedit! #{:d} | wincmd P".format(number))
         else:
