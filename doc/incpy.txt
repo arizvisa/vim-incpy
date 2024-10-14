@@ -407,6 +407,10 @@ incpy#Show()
 							*incpy#Hide()*
 incpy#Hide()
 	Hide the output window for the interpreter from the current tab.
+							*incpy#ExecuteRaw()*
+incpy#ExecuteRaw({string})
+	Send the specified string to the current interpreter without
+	any stripping or formatting.
 							*incpy#Execute()*
 incpy#Execute({string})
 	Send the specified string to the current interpreter formatted

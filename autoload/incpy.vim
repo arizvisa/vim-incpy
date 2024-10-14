@@ -481,6 +481,14 @@ function! incpy#Execute(line)
     endif
 endfunction
 
+function! incpy#ExecuteRaw(line)
+    call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
+    call s:communicate_interpreter_encoded("{}", a:line)
+    if g:incpy#OutputFollow
+        try | call s:windowtail(g:incpy#BufferId) | catch /^Invalid/ | endtry
+    endif
+endfunction
+
 function! incpy#ExecuteRange() range
     call incpy#Range(a:firstline, a:lastline)
 endfunction
