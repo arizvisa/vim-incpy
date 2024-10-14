@@ -479,6 +479,7 @@ function! incpy#SetupCommands()
     command -range PyRange call incpy#Range(<line1>, <line2>)
 
     command -nargs=1 Py call incpy#Execute(<q-args>)
+    command -nargs=1 PyRaw call incpy#ExecuteRaw(<q-args>)
     command -range PyExecuteRange <line1>,<line2>call incpy#ExecuteRange()
     command -range PyExecuteBlock <line1>,<line2>call incpy#ExecuteBlock()
     command -range PyExecuteSelection <line1>,<line2>call incpy#ExecuteSelected()

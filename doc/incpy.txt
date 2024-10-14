@@ -349,6 +349,11 @@ can be called directly.
 :Py {string}
 	Execute the specified string within the interpreter using the
 	|incpy#Execute| function.
+							*:PyRaw*
+:PyRaw {string}
+	Execute the specified string within the interpreter using the
+	|incpy#ExecuteRaw| function. This does not do any formatting
+	and can be used to communicate directly to an interpreter.
 							*:PyLine*
 :PyLine
 	Execute the current lines within the interpreter using the
