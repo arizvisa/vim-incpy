@@ -474,8 +474,7 @@ endfunction
 """ Plugin interaction interface
 function! incpy#Execute(line)
     call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
-
-    call s:execute_interpreter_cache('communicate', [s:quote_single(a:line)])
+    call s:communicate_interpreter_encoded(s:singleline(g:incpy#ExecFormat, "\"\\"), a:line)
     if g:incpy#OutputFollow
         try | call s:windowtail(g:incpy#BufferId) | catch /^Invalid/ | endtry
     endif
