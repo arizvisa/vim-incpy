@@ -517,11 +517,11 @@ function! incpy#SetupKeys()
     " If we have terminal support, then add a mapping that makes
     " pasting from a register similar to cmdline-mode.
     if has('terminal')
-        tnoremap <C-R> <C-W>"
+        tnoremap <silent> <C-R> <C-W>"
     elseif has('nvim')
         "tnoremap <expr> <C-R> '<C-\><C-o>"'.nr2char(getchar()).'p'
-        tnoremap <C-R>= <Cmd>call chansend(b:terminal_job_id, eval(input('=')))<CR>
-        tnoremap <C-R> <Cmd>call chansend(b:terminal_job_id, getreg(nr2char(getchar())))<CR>
+        tnoremap <silent> <C-R>= <Cmd>call chansend(b:terminal_job_id, eval(input('=')))<CR>
+        tnoremap <silent> <C-R> <Cmd>call chansend(b:terminal_job_id, getreg(nr2char(getchar())))<CR>
     endif
 endfunction
 

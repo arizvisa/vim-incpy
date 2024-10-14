@@ -69,12 +69,17 @@ The following keybindings are mapped to normal and visual mode:
 								*CTRL-@*
 	<C-@>		Display the help for the word under the cursor.
 
+The following keybindings are applied to |terminal-mode| to make it appear
+similar to |Command-line-mode|.
+
+	<C-R> {reg}	Paste from the specified register.
+
 By default, the plugin will use the internal |Python| interpreter compiled
 into the editor. Through configuration, however, any command that reads
 from stdin and writes to stdout can be used. Depending on the interpreter,
 there may be extra configuration needed in order format the code being
-submitted to the target process. Please review the configuration section
-for more details.
+submitted to the target process. Please review the |incpy-configuration|
+section for more details.
 
 ==============================================================================
 INTERPRETERS						*incpy-interpreters*
