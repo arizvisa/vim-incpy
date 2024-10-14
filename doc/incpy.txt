@@ -409,35 +409,52 @@ incpy#Hide()
 	Hide the output window for the interpreter from the current tab.
 							*incpy#Execute()*
 incpy#Execute({string})
-	Send the specified string to the current interpreter.
+	Send the specified string to the current interpreter formatted
+	with |g:incpy#ExecFormat|. The input string will be stripped
+	by the contents of the |g:incpy#ExecStrip| variable.
 							*incpy#ExecuteRange()*
 incpy#ExecuteRange() range
-	Execute the current range within the interpreter.
+	Execute the current range within the interpreter with formatted
+	by |g:incpy#ExecFormat|. The input will be stripped by the contents
+	of the |g:incpy#ExecStrip| variable.
 							*incpy#ExecuteBlock()*
 incpy#ExecuteBlock() range
-	Execute the current block within the interpreter.
+	Execute the current block within the interpreter with each line
+	being formatted by |g:incpy#ExecFormat|. The input will be stripped
+	by the contents of the |g:incpy#ExecStrip| variable.
 							*incpy#ExecuteSelected()*
 incpy#ExecuteSelected() range
-	Execute the current selection within the interpreter.
+	Execute the current selection within the interpreter with each
+	line being formatted by |g:incpy#ExecFormat|. The input will be
+	stripped by the contents of the |g:incpy#ExecStrip| variable.
 							*incpy#ExecuteFile()*
 incpy#ExecuteFile({filename})
 	Execute the contents of the specified file within the interpreter.
 							*incpy#Range()*
 incpy#Range({begin}, {end})
 	Execute the line numbers from {begin} to {end} of the current
-	file within the interpreter.
+	file within the interpreter formatted by |g:incpy#ExecFormat|.
+	The input will be stripped by the |g:incpy#ExecStrip| variable.
 							*incpy#Evaluate()*
 incpy#Evaluate({expr})
-	Evaluate the specified string as an expression in the interpreter.
+	Evaluate the specified string as an expression in the interpreter
+	with the entire expression being formatted by |g:incpy#EvalFormat|.
+	The expression will be stripped by the |g:incpy#EvalStrip| variable.
 							*incpy#EvaluateRange()*
 incpy#EvaluateRange() range
-	Evaluate the current range within the interpreter.
+	Evaluate the current range within the interpreter with the entire
+	expression being formatted by |g:incpy#EvalFormat|. The input will
+	be stripped by the contents of the |g:incpy#EvalStrip| variable.
 							*incpy#EvaluateBlock()*
 incpy#EvaluateBlock() range
-	Evaluate the current block within the interpreter.
+	Evaluate the current block within the interpreter with the entire
+	expression being formatted by |g:incpy#EvalFormat|. The input will
+	be stripped by the contents of the |g:incpy#EvalStrip| variable.
 							*incpy#EvaluateSelected()*
 incpy#EvaluateSelected() range
-	Evaluate the current selection within the interpreter.
+	Evaluate the current selection within the interpreter with the
+	entire expression being formatted by |g:incpy#EvalFormat|. The input
+	will be stripped by the contents of the |g:incpy#EvalStrip| variable.
 							*incpy#Halp()*
 incpy#Halp({expr})
 	View the help for the expression specified as a string within
