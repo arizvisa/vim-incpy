@@ -168,15 +168,13 @@ to be presented to the user. These options are as follows:
 	The ratio of the window size relative to the current window being
 	splitted. By default this ratio is set to `0.333333` or `1/3`.
 
-:let *g:incpy#WindowFixed* = (|Boolean|)
-	Specify whether the window width and height should be kept when
-	windows are opened or closed. This is responsible for setting the
-	|winfixheight| and |winfixwidth| options on the output window.
-
 :let *g:incpy#WindowOptions* = (|Dictionary|)
 	Customize the options for the window displaying the interpreter
 	output. This dictionary is used to set the local window options
-	using the |:setlocal| command.
+	using the |:setlocal| command. To prevent the editor from auto-
+	resizing the width or height of the output window when it is opened
+	or closed, the |winfixheight| and |winfixwidth| keys in this dictionary
+	can be set to `v:true`.
 
 :let *g:incpy#OutputFollow* = (|Boolean|)
 	Specify whether the interpreter window should always seek to the
