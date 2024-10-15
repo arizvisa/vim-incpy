@@ -75,7 +75,6 @@
 " string g:incpy#ExecStrip    -- describes how to strip input before being executed
 "
 " string g:incpy#WindowName     -- the name of the output buffer. defaults to "Scratch".
-" bool   g:incpy#WindowFixed    -- refuse to allow automatic resizing of the window.
 " dict   g:incpy#WindowOptions  -- the options to use when creating the output window.
 " bool   g:incpy#WindowPreview  -- whether to use preview windows for the program output.
 " float  g:incpy#WindowRatio    -- the ratio of the window size when creating it
@@ -397,7 +396,6 @@ function! incpy#SetupOptions()
     let defopts["WindowPosition"] = "below"
     let defopts["WindowOptions"] = {}
     let defopts["WindowPreview"] = v:false
-    let defopts["WindowFixed"] = 0
     let defopts["WindowStartup"] = v:true
 
     let defopts["Greenlets"] = v:false
@@ -425,8 +423,22 @@ function! incpy#SetupOptions()
     endif
 
     " Default window options that the user will override
-    let neo_window_options = {'buftype': 'nofile', 'swapfile': v:false, 'updatecount':0, 'buflisted': v:false}
-    let core_window_options = {'buftype': has('terminal')? 'terminal' : 'nowrite', 'swapfile': v:false, 'updatecount':0, 'buflisted': v:false}
+    let neo_window_options = {
+    \   'buftype': 'nofile',
+    \   'swapfile': v:false,
+    \   'updatecount':0,
+    \   'buflisted': v:false,
+    \   'bufhidden': v:true,
+    \}
+
+    let core_window_options = {
+    \   'buftype': has('terminal')? 'terminal' : 'nofile',
+    \   'swapfile': v:false,
+    \   'updatecount':0,
+    \   'buflisted': v:false,
+    \   'bufhidden': v:true,
+    \}
+
     let defopts["CoreWindowOptions"] = has('nvim')? neo_window_options : core_window_options
 
     " If any of these options aren't defined during evaluation, then go through and assign them as defaults
