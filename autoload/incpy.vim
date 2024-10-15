@@ -400,12 +400,6 @@ function! s:get_window_options(other={})
         let result['preview'] = g:incpy#WindowPreview
     endif
 
-    " If the user wants the window to be fixed, then set the correct options.
-    if exists('g:incpy#WindowFixed') && g:incpy#WindowFixed
-        let result['winfixwidth'] = v:true
-        let result['winfixheight'] = v:true
-    endif
-
     " Merge in any custom window options that were assigned.
     for o in keys(g:incpy#WindowOptions)
         let result[o] = g:incpy#WindowOptions[o]
