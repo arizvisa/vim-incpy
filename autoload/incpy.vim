@@ -394,7 +394,8 @@ function! s:get_window_options(other={})
         let result[o] = core[o]
     endfor
 
-    " Specially handle the window preview option.
+    " Specially handle the window preview option. This dictionary key isn't an
+    " option, but is used to influence the command used to create the window.
     if exists('g:incpy#WindowPreview')
         let result['preview'] = g:incpy#WindowPreview
     endif
@@ -405,7 +406,12 @@ function! s:get_window_options(other={})
         let result['winfixheight'] = v:true
     endif
 
-    " Merge any of the other options that we were given
+    " Merge in any custom window options that were assigned.
+    for o in keys(g:incpy#WindowOptions)
+        let result[o] = g:incpy#WindowOptions[o]
+    endfor
+
+    " Merge in any of the other options that we were given.
     for o in keys(a:other)
         let result[o] = a:other[o]
     endfor
