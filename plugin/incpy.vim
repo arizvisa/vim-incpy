@@ -75,7 +75,6 @@
 " string g:incpy#ExecStrip    -- describes how to strip input before being executed
 "
 " string g:incpy#WindowName     -- the name of the output buffer. defaults to "Scratch".
-" bool   g:incpy#WindowFixed    -- refuse to allow automatic resizing of the window.
 " dict   g:incpy#WindowOptions  -- the options to use when creating the output window.
 " bool   g:incpy#WindowPreview  -- whether to use preview windows for the program output.
 " float  g:incpy#WindowRatio    -- the ratio of the window size when creating it
@@ -397,7 +396,6 @@ function! incpy#SetupOptions()
     let defopts["WindowPosition"] = "below"
     let defopts["WindowOptions"] = {}
     let defopts["WindowPreview"] = v:false
-    let defopts["WindowFixed"] = 0
     let defopts["WindowStartup"] = v:true
 
     let defopts["Greenlets"] = v:false
