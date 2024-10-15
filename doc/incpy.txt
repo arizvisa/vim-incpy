@@ -553,11 +553,13 @@ for emitting the result of an expression.
 	let g:incpy#WindowOptions = {
 	\	"filetype": "python",
 	\	"cursorcolumn": v:true,
-	\	"cursorline": v:true
+	\	"cursorline": v:true,
+	\	"winfixheight": v:false, "winfixwidth": v:false,
 	\}
 
 	let g:incpy#EchoFormat = '{}'
 	let g:incpy#EvalFormat = "__import__(\"sys\").displayhook(({}))\n"
+	let g:incpy#WindowPreview = v:true
 
 	let _ =<< trim EOS
 		%1$s.getpager = lambda: %1$s.plainpager
