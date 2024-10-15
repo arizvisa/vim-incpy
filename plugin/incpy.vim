@@ -423,8 +423,22 @@ function! incpy#SetupOptions()
     endif
 
     " Default window options that the user will override
-    let neo_window_options = {'buftype': 'nofile', 'swapfile': v:false, 'updatecount':0, 'buflisted': v:false}
-    let core_window_options = {'buftype': has('terminal')? 'terminal' : 'nowrite', 'swapfile': v:false, 'updatecount':0, 'buflisted': v:false}
+    let neo_window_options = {
+    \   'buftype': 'nofile',
+    \   'swapfile': v:false,
+    \   'updatecount':0,
+    \   'buflisted': v:false,
+    \   'bufhidden': v:true,
+    \}
+
+    let core_window_options = {
+    \   'buftype': has('terminal')? 'terminal' : 'nofile',
+    \   'swapfile': v:false,
+    \   'updatecount':0,
+    \   'buflisted': v:false,
+    \   'bufhidden': v:true,
+    \}
+
     let defopts["CoreWindowOptions"] = has('nvim')? neo_window_options : core_window_options
 
     " If any of these options aren't defined during evaluation, then go through and assign them as defaults
