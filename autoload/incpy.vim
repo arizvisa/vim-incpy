@@ -424,16 +424,15 @@ function! incpy#Range(begin, end)
         throw printf("Unable to process the given input due to it being of an unsupported type (%s): %s", typename(input_stripped), input_stripped)
     endif
 
-    " Strip our input prior to its execution.
+    " Strip our input prior to its execution, then check its result type
+    " to ensure that we can pass to the interpreter without issue.
     let code_stripped = s:strip_by_option(g:incpy#ExecStrip, input_stripped)
-    call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
-
-    " If it's not a list or a string, then we don't support it.
     if !(type(code_stripped) == v:t_string || type(code_stripped) == v:t_list)
-        throw printf("Unable to execute due to an unknown input type (%s): %s", typename(code_stripped), code_stripped)
+        throw printf("Unable to execute due to an unknown input type (%s) being returned by %s: %s", typename(code_stripped), 'g:incpy#ExecStrip', code_stripped)
     endif
 
-    " If we've got a string, then execute it as a single line.
+    " Show the window and then send each line to the interpreter.
+    call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
     let l:commands_stripped = (type(code_stripped) == v:t_list)? code_stripped : [code_stripped]
     for command_stripped in l:commands_stripped
         call s:communicate_interpreter_encoded(s:singleline(g:incpy#ExecFormat, "\"\\"), command_stripped)
@@ -474,22 +473,18 @@ endfunction
 """ Plugin interaction interface
 function! incpy#Execute(line)
     let input_stripped = s:strip_by_option(g:incpy#InputStrip, a:line)
-
-    " Verify that the input returned is a type that we support
     if index([v:t_string, v:t_list], type(input_stripped)) < 0
         throw printf("Unable to process the given input due to it being of an unsupported type (%s): %s", typename(input_stripped), input_stripped)
     endif
 
-    " Strip our input prior to its execution.
+    " Now we need to strip our input for execution.
     let code_stripped = s:strip_by_option(g:incpy#ExecStrip, input_stripped)
-    call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
-
-    " If it's not a list or a string, then we don't support it.
     if !(type(code_stripped) == v:t_string || type(code_stripped) == v:t_list)
-        throw printf("Unable to execute due to an unknown input type (%s): %s", typename(code_stripped), code_stripped)
+        throw printf("Unable to execute due to an unknown input type (%s) being returned by %s: %s", typename(code_stripped), 'g:incpy#ExecStrip', code_stripped)
     endif
 
-    " If we've got a string, then execute it as a single line.
+    " Show the window and send each line from our input to the interpreter.
+    call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
     let l:commands_stripped = (type(code_stripped) == v:t_list)? code_stripped : [code_stripped]
     for command_stripped in l:commands_stripped
         call s:communicate_interpreter_encoded(s:singleline(g:incpy#ExecFormat, "\"\\"), command_stripped)
