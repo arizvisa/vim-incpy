@@ -487,7 +487,7 @@ endfunction
 " Create some vim commands that can interact with the plugin
 function! incpy#SetupCommands()
     if has('folding')
-        command PyLine call incpy#Range(foldlevel(line('.'))>0? foldclosed(line('.')) : line('.'), foldlevel(line('.'))>0? foldclosedend(line('.')) : line('.'))
+        command PyLine call incpy#Range(foldclosed(line('.'))>0? foldclosed(line('.')) : line('.'), foldclosedend(line('.'))>0? foldclosedend(line('.')) : line('.'))
     else
         command PyLine call incpy#Range(line("."), line("."))
     endif
