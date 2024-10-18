@@ -617,6 +617,9 @@ class buffer(object):
             position += len(item)
         return
 
+    def flush(self):
+        return
+
     def write(self, data):
         lines = iter(data.split('\n'))
         with vim.buffer.update(self.buffer) as buffer:
@@ -653,7 +656,16 @@ class buffer(object):
     def seek(self, target, whence=0):
         raise NotImplementedError('seek', target, whence)
 
+    def tell(self):
+        raise NotImplementedError('tell')
+
     def seekable(self):
+        return False
+
+    def fileno(self):
+        raise OSError
+
+    def isatty(self):
         return False
 
 class multiview(object):
@@ -910,6 +922,10 @@ class multiview(object):
     seek = property(fget=lambda self: self.buffer.seek)
     seekable = property(fget=lambda self: self.buffer.seekable)
     truncate = property(fget=lambda self: self.buffer.truncate)
+    flush = property(fget=lambda self: self.buffer.flush)
+    fileno = property(fget=lambda self: self.buffer.fileno)
+    isatty = property(fget=lambda self: self.buffer.isatty)
+    tell = property(fget=lambda self: self.buffer.tell)
 
     # hidden methods
     @classmethod
