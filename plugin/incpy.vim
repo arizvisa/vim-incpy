@@ -428,7 +428,7 @@ function! incpy#SetupOptions()
     \   'swapfile': v:false,
     \   'updatecount':0,
     \   'buflisted': v:false,
-    \   'bufhidden': v:true,
+    \   'bufhidden': 'hide',
     \}
 
     let core_window_options = {
@@ -436,7 +436,7 @@ function! incpy#SetupOptions()
     \   'swapfile': v:false,
     \   'updatecount':0,
     \   'buflisted': v:false,
-    \   'bufhidden': v:true,
+    \   'bufhidden': 'hide',
     \}
 
     let defopts["CoreWindowOptions"] = has('nvim')? neo_window_options : core_window_options
