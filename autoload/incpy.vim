@@ -138,7 +138,7 @@ function! s:stripstring_by_option(option, string)
 
     elseif type(a:option) == v:t_func
         let F = a:option
-        let result = F(a:string)
+        let result = F([a:string])
 
     else
         throw printf("Unable to strip string due to an unknown filtering option (%s): %s", typename(a:option), a:option)
