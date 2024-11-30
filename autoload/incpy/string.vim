@@ -1,4 +1,6 @@
-""" Utilities for escaping strings and such
+""" Utility functions for indentation, stripping, string processing, etc.
+
+"" Utilities for escaping strings and such
 function! incpy#string#escape_single(string)
     return escape(a:string, '''\')
 endfunction
@@ -22,7 +24,7 @@ function! incpy#string#singleline(string, escape)
     return result
 endfunction
 
-""" Utilities for stripping strings and lists of strings.
+"" Utilities for stripping strings and lists of strings.
 function! s:striplist_by_option(option, lines)
     let items = a:lines
 
@@ -75,4 +77,58 @@ function! incpy#string#strip(option, input)
         throw printf("Unknown parameter type: %s", type(a:input))
     endif
     return result
+endfunction
+
+" count the whitespace that prefixes a single-line string
+function! incpy#string#count_indent(string)
+    let characters = 0
+    for c in split(a:string, '\zs')
+        if stridx(" \t", c) == -1
+            break
+        endif
+        let characters += 1
+    endfor
+    return characters
+endfunction
+
+" find the smallest common indent of a list of strings
+function! incpy#string#find_common_indent(lines)
+    let smallestindent = -1
+    for l in a:lines
+
+        " skip lines that are all whitespace
+        if strlen(l) == 0 || l =~ '^\s\+$'
+            continue
+        endif
+
+        let spaces = incpy#string#count_indent(l)
+        if smallestindent < 0 || spaces < smallestindent
+            let smallestindent = spaces
+        endif
+    endfor
+    return smallestindent
+endfunction
+
+" strip the specified number of characters from a list of lines
+function! incpy#string#strip_common_indent(lines, size)
+    let results = []
+    let prevlength = 0
+
+    " iterate through each line
+    for l in a:lines
+
+        " if the line is empty, then pad it with the previous indent
+        if strlen(l) == 0
+            let row = repeat(" ", prevlength)
+
+        " otherwise remove the requested size, and count the leftover indent
+        else
+            let row = strpart(l, a:size)
+            let prevlength = incpy#string#count_indent(row)
+        endif
+
+        " append our row to the list of results
+        let results += [row]
+    endfor
+    return results
 endfunction
