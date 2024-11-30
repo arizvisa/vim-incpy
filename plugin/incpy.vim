@@ -109,124 +109,11 @@ if exists("g:loaded_incpy") && g:loaded_incpy
 endif
 let g:loaded_incpy = v:true
 
-""" Utilities for dealing with visual-mode selection
-
-function! s:selected() range
-    " really, vim? really??
-    let oldvalue = getreg("")
-    normal gvy
-    let result = getreg("")
-    call setreg("", oldvalue)
-    return split(result, '\n')
-endfunction
-
-function! s:selected_range() range
-    let [l:left, l:right] = [getcharpos("'<"), getcharpos("'>")]
-    let [l:lline, l:rline] = [l:left[1], l:right[1]]
-    let [l:lchar, l:rchar] = [l:left[2], l:right[2]]
-
-    if l:lline < l:rline
-        let [l:minline, l:maxline] = [l:lline, l:rline]
-        let [l:minchar, l:maxchar] = [l:lchar, l:rchar]
-    elseif l:lline > l:rline
-        let [l:minline, l:maxline] = [l:rline, l:lline]
-        let [l:minchar, l:maxchar] = [l:rchar, l:lchar]
-    else
-        let [l:minline, l:maxline] = [l:lline, l:rline]
-        let [l:minchar, l:maxchar] = sort([l:lchar, l:rchar], 'N')
-    endif
-
-    let lines = getline(l:minline, l:maxline)
-    if len(lines) > 2
-        let selection = [strcharpart(lines[0], l:minchar - 1)] + slice(lines, 1, -1) + [strcharpart(lines[-1], 0, l:maxchar)]
-    elseif len(lines) > 1
-        let selection = [strcharpart(lines[0], l:minchar - 1)] + [strcharpart(lines[-1], 0, l:maxchar)]
-    else
-        let selection = [strcharpart(lines[0], l:minchar - 1, 1 + l:maxchar - l:minchar)]
-    endif
-    return selection
-endfunction
-
-function! s:selected_block() range
-    let [l:left, l:right] = [getcharpos("'<"), getcharpos("'>")]
-    let [l:lline, l:rline] = [l:left[1], l:right[1]]
-    let [l:lchar, l:rchar] = [l:left[2], l:right[2]]
-
-    if l:lline < l:rline
-        let [l:minline, l:maxline] = [l:lline, l:rline]
-        let [l:minchar, l:maxchar] = [l:lchar, l:rchar]
-    elseif l:lline > l:rline
-        let [l:minline, l:maxline] = [l:rline, l:lline]
-        let [l:minchar, l:maxchar] = [l:rchar, l:lchar]
-    else
-        let [l:minline, l:maxline] = [l:lline, l:rline]
-        let [l:minchar, l:maxchar] = sort([l:lchar, l:rchar], 'N')
-    endif
-
-    let lines = getline(l:minline, l:maxline)
-    let selection = map(lines, 'strcharpart(v:val, l:minchar - 1, 1 + l:maxchar - l:minchar)')
-    return selection
-endfunction
-
 """ Utility functions for indentation, stripping, string processing, etc.
 
-" count the whitespace that prefixes a single-line string
-function! s:count_indent(string)
-    let characters = 0
-    for c in split(a:string, '\zs')
-        if stridx(" \t", c) == -1
-            break
-        endif
-        let characters += 1
-    endfor
-    return characters
-endfunction
-
-" find the smallest common indent of a list of strings
-function! s:find_common_indent(lines)
-    let smallestindent = -1
-    for l in a:lines
-
-        " skip lines that are all whitespace
-        if strlen(l) == 0 || l =~ '^\s\+$'
-            continue
-        endif
-
-        let spaces = s:count_indent(l)
-        if smallestindent < 0 || spaces < smallestindent
-            let smallestindent = spaces
-        endif
-    endfor
-    return smallestindent
-endfunction
-
-" strip the specified number of characters from a list of lines
-function! s:strip_common_indent(lines, size)
-    let results = []
-    let prevlength = 0
-
-    " iterate through each line
-    for l in a:lines
-
-        " if the line is empty, then pad it with the previous indent
-        if strlen(l) == 0
-            let row = repeat(" ", prevlength)
-
-        " otherwise remove the requested size, and count the leftover indent
-        else
-            let row = strpart(l, a:size)
-            let prevlength = s:count_indent(row)
-        endif
-
-        " append our row to the list of results
-        let results += [row]
-    endfor
-    return results
-endfunction
-
 function! s:python_strip_and_fix_indent(lines)
-    let indentsize = s:find_common_indent(a:lines)
-    let stripped = s:strip_common_indent(a:lines, indentsize)
+    let indentsize = incpy#string#find_common_indent(a:lines)
+    let stripped = incpy#string#strip_common_indent(a:lines, indentsize)
 
     " trim any beginning lines that are meaningless
     let l:start = 0
@@ -256,30 +143,6 @@ function! s:python_strip_and_fix_indent(lines)
         let result = trimmed
     endif
     return join(result, "\n") .. "\n"
-endfunction
-
-""" Utilities for escaping strings and such
-function! s:escape_single(string)
-    return escape(a:string, '''\')
-endfunction
-
-function! s:escape_double(string)
-    return escape(a:string, '"\')
-endfunction
-
-function! s:quote_single(string)
-    return printf("'%s'", escape(a:string, '''\'))
-endfunction
-
-function! s:quote_double(string)
-    return printf("\"%s\"", escape(a:string, '"\'))
-endfunction
-
-" escape the multiline string with the specified characters and return it as a single-line string
-function! s:singleline(string, escape)
-    let escaped = escape(a:string, a:escape)
-    let result = substitute(escaped, "\n", "\\\\n", "g")
-    return result
 endfunction
 
 """ Miscellaneous utilities related to python
@@ -401,9 +264,9 @@ function! incpy#SetupOptions()
     let defopts["Greenlets"] = v:false
     let defopts["Terminal"] = has('terminal') || has('nvim')
 
-    let python_builtins = printf("__import__(%s)", s:quote_double('builtins'))
-    let python_pydoc = printf("__import__(%s)", s:quote_double('pydoc'))
-    let python_sys = printf("__import__(%s)", s:quote_double('sys'))
+    let python_builtins = printf("__import__(%s)", incpy#string#quote_double('builtins'))
+    let python_pydoc = printf("__import__(%s)", incpy#string#quote_double('pydoc'))
+    let python_sys = printf("__import__(%s)", incpy#string#quote_double('sys'))
     let python_help = join([python_builtins, 'help'], '.')
     let defopts["HelpFormat"] = printf("%s.getpager = lambda: %s.plainpager\ntry:exec(\"%s({0})\")\nexcept SyntaxError:%s(\"{0}\")\n\n", python_pydoc, python_pydoc, escape(python_help, "\"\\"), python_help)
 
