@@ -6,7 +6,7 @@ function! s:generate_gvar_expression(name)
 endfunction
 
 " convert from a vim native type to a string that can be interpreted by python
-function! s:render_native_as_python(object)
+function! s:render_vim_atomic(object)
     let object_type = type(a:object)
     if object_type == v:t_number
         return printf('%d', a:object)
@@ -30,17 +30,17 @@ function! s:render_native_as_python(object)
 endfunction
 
 " convert from a vim type (container or native) to a string that can be interpreted by python
-function! s:render_as_python(object)
+function! incpy#python#render(object)
     let object_type = type(a:object)
     if object_type == v:t_list
-        let items = map(a:object, 's:render_as_python(v:val)')
+        let items = map(a:object, 'incpy#python#render(v:val)')
         return printf('[%s]', join(items, ','))
     elseif object_type == v:t_dict
-        let rendered = map(a:object, 'printf("%s:%s", s:render_as_python(v:key), s:render_as_python(v:val))')
+        let rendered = map(a:object, 'printf("%s:%s", incpy#python#render(v:key), incpy#python#render(v:val))')
         let items = map(keys(rendered), 'get(rendered, v:val)')
         return printf('{%s}', join(items, ','))
     else
-        return s:render_native_as_python(a:object)
+        return s:render_vim_atomic(a:object)
     endif
 endfunction
 
@@ -71,21 +71,21 @@ function! s:execute_python_in_workspace(package, command)
     execute printf("pythonx (lambda F, ns: (lambda s: F(s, ns, ns)))(%s, %s)(%s)", l:python_execute, l:python_workspace, strings)
 endfunction
 
-function! s:execute_interpreter_cache(method, parameters, keywords={})
+function! incpy#python#execute(method, parameters, keywords={})
     let l:cache = [printf('__import__(%s)', incpy#string#quote_single(g:incpy#PackageName)), 'cache']
     let l:method = (type(a:method) == v:t_list)? a:method : [a:method]
-    let l:kwparameters = len(a:keywords)? [printf('**%s', s:render_as_python(a:keywords))] : []
+    let l:kwparameters = len(a:keywords)? [printf('**%s', incpy#python#render(a:keywords))] : []
     call s:execute_python_in_workspace(g:incpy#PackageName, printf('%s(%s)', join(l:cache + l:method, '.'), join(a:parameters + l:kwparameters, ', ')))
 endfunction
 
-function! s:execute_interpreter_cache_guarded(method, parameters, keywords={})
+function! incpy#python#execute_guarded(method, parameters, keywords={})
     let l:cache = [printf('__import__(%s)', incpy#string#quote_single(g:incpy#PackageName)), 'cache']
     let l:method = (type(a:method) == v:t_list)? a:method : [a:method]
-    let l:kwparameters = len(a:keywords)? [printf('**%s', s:render_as_python(a:keywords))] : []
+    let l:kwparameters = len(a:keywords)? [printf('**%s', incpy#python#render(a:keywords))] : []
     call s:execute_python_in_workspace(g:incpy#PackageName, printf("hasattr(%s, %s) and %s(%s)", join(slice(l:cache, 0, -1), '.'), incpy#string#quote_single(l:cache[-1]), join(l:cache + l:method, '.'), join(a:parameters + l:kwparameters, ', ')))
 endfunction
 
-function! s:communicate_interpreter_encoded(format, code)
+function! incpy#python#communicate(format, code)
     let l:cache = [printf('__import__(%s)', incpy#string#quote_single(g:incpy#PackageName)), 'cache']
     let l:encoded = substitute(a:code, '.', '\=printf("\\x%02x", char2nr(submatch(0)))', 'g')
     let l:lambda = printf("(lambda interpreter: (lambda code: interpreter.communicate(code)))(%s)", join(cache, '.'))
@@ -249,10 +249,10 @@ function! incpy#python#Range(begin, end)
     endif
 
     " Show the window and then send each line to the interpreter.
-    call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
+    call incpy#python#execute_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
     let l:commands_stripped = (type(code_stripped) == v:t_list)? code_stripped : [code_stripped]
     for command_stripped in l:commands_stripped
-        call s:communicate_interpreter_encoded(incpy#string#singleline(g:incpy#ExecFormat, "\"\\"), command_stripped)
+        call incpy#python#communicate(incpy#string#singleline(g:incpy#ExecFormat, "\"\\"), command_stripped)
     endfor
 
     " If the user configured us to follow the output, then do as we were told.
@@ -263,28 +263,28 @@ endfunction
 
 " Start the target program and attach it to a buffer
 function! incpy#python#Start()
-    call s:execute_interpreter_cache('start', [])
+    call incpy#python#execute('start', [])
 endfunction
 
 " Stop the target program and detach it from its buffer
 function! incpy#python#Stop()
-    call s:execute_interpreter_cache('stop', [])
+    call incpy#python#execute('stop', [])
 endfunction
 
 " Restart the target program by stopping and starting it
 function! incpy#python#Restart()
     for method in ['stop', 'start']
-        call s:execute_interpreter_cache(method, [])
+        call incpy#python#execute(method, [])
     endfor
 endfunction
 
 function! incpy#python#Show()
     let parameters = map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)')
-    call s:execute_interpreter_cache_guarded(['show'], parameters, s:get_window_options())
+    call incpy#python#execute_guarded(['show'], parameters, s:get_window_options())
 endfunction
 
 function! incpy#python#Hide()
-    call s:execute_interpreter_cache_guarded(['hide'], [])
+    call incpy#python#execute_guarded(['hide'], [])
 endfunction
 
 """ Plugin interaction interface
@@ -301,10 +301,10 @@ function! incpy#python#Execute(line)
     endif
 
     " Show the window and send each line from our input to the interpreter.
-    call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
+    call incpy#python#execute_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
     let l:commands_stripped = (type(code_stripped) == v:t_list)? code_stripped : [code_stripped]
     for command_stripped in l:commands_stripped
-        call s:communicate_interpreter_encoded(incpy#string#singleline(g:incpy#ExecFormat, "\"\\"), command_stripped)
+        call incpy#python#communicate(incpy#string#singleline(g:incpy#ExecFormat, "\"\\"), command_stripped)
     endfor
 
     " If the user configured us to follow the output, then do as we were told.
@@ -314,8 +314,8 @@ function! incpy#python#Execute(line)
 endfunction
 
 function! incpy#python#ExecuteRaw(line)
-    call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
-    call s:communicate_interpreter_encoded("{}", a:line)
+    call incpy#python#execute_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
+    call incpy#python#communicate("{}", a:line)
     if g:incpy#OutputFollow
         try | call incpy#ui#window#tail(g:incpy#BufferId) | catch /^Invalid/ | endtry
     endif
@@ -325,8 +325,8 @@ function! incpy#python#Evaluate(expr)
     let stripped = incpy#string#strip(g:incpy#EvalStrip, a:expr)
 
     " Evaluate and emit an expression in the target using the plugin
-    call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
-    call s:communicate_interpreter_encoded(incpy#string#singleline(g:incpy#EvalFormat, "\"\\"), stripped)
+    call incpy#python#execute_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
+    call incpy#python#communicate(incpy#string#singleline(g:incpy#EvalFormat, "\"\\"), stripped)
 
     if g:incpy#OutputFollow
         try | call incpy#ui#window#tail(g:incpy#BufferId) | catch /^Invalid/ | endtry
@@ -338,14 +338,14 @@ function! incpy#python#Halp(expr)
 
     " Execute g:incpy#HelpFormat in the target using the plugin's cached communicator
     if len(LetMeSeeYouStripped) > 0
-        call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
-        call s:communicate_interpreter_encoded(incpy#string#singleline(g:incpy#HelpFormat, "\"\\"), incpy#string#escape_double(LetMeSeeYouStripped))
+        call incpy#python#execute_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
+        call incpy#python#communicate(incpy#string#singleline(g:incpy#HelpFormat, "\"\\"), incpy#string#escape_double(LetMeSeeYouStripped))
     endif
 endfunction
 
 function! incpy#python#ExecuteFile(filename)
     let open_and_execute = printf("with open(%s) as infile: exec(infile.read())", incpy#string#quote_double(a:filename))
-    call s:execute_interpreter_cache('communicate', [incpy#string#quote_single(open_and_execute), 'silent=True'])
+    call incpy#python#execute('communicate', [incpy#string#quote_single(open_and_execute), 'silent=True'])
 endfunction
 
 """ Internal interface for setting up the plugin loader and packages
