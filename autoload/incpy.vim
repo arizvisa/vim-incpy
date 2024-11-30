@@ -1,88 +1,10 @@
-function! s:striplist_by_option(option, lines)
-    let items = a:lines
-
-    " Strip the fetched lines if the user configured us to
-    if type(a:option) == v:t_bool
-        let result = a:option == v:true? map(items, "trim(v:val)") : items
-
-    " If the type is a string, then use it as a regex that
-    elseif type(a:option) == v:t_string
-        let result = map(items, a:option)
-
-    " Otherwise it's a function to use as a transformation
-    elseif type(a:option) == v:t_func
-        let F = a:option
-        let result = F(items)
-
-    " Anything else is an unsupported filtering option.
-    else
-        throw printf("Unable to strip lines using an unknown filtering option (%s): %s", typename(a:option), a:option)
-    endif
-
-    return result
-endfunction
-
-function! s:stripstring_by_option(option, string)
-    if type(a:option) == v:t_bool
-        let result = a:option == v:true? trim(a:string) : a:string
-
-    elseif type(a:option) == v:t_string
-        let expression = a:option
-        let results = map([a:string], expression)
-        let result = results[0]
-
-    elseif type(a:option) == v:t_func
-        let F = a:option
-        let result = F([a:string])
-
-    else
-        throw printf("Unable to strip string due to an unknown filtering option (%s): %s", typename(a:option), a:option)
-    endif
-    return result
-endfunction
-
-function! s:strip_by_option(option, input)
-    if type(a:input) == v:t_list
-        let result = s:striplist_by_option(a:option, a:input)
-    elseif type(a:input) == v:t_string
-        let result = s:stripstring_by_option(a:option, a:input)
-    else
-        throw printf("Unknown parameter type: %s", type(a:input))
-    endif
-    return result
-endfunction
-
-""" Utilities for escaping strings and such
-function! s:escape_single(string)
-    return escape(a:string, '''\')
-endfunction
-
-function! s:escape_double(string)
-    return escape(a:string, '"\')
-endfunction
-
-function! s:quote_single(string)
-    return printf("'%s'", escape(a:string, '''\'))
-endfunction
-
-function! s:quote_double(string)
-    return printf("\"%s\"", escape(a:string, '"\'))
-endfunction
-
-" escape the multiline string with the specified characters and return it as a single-line string
-function! s:singleline(string, escape)
-    let escaped = escape(a:string, a:escape)
-    let result = substitute(escaped, "\n", "\\\\n", "g")
-    return result
-endfunction
-
 " convert from a vim native type to a string that can be interpreted by python
 function! s:render_native_as_python(object)
     let object_type = type(a:object)
     if object_type == v:t_number
         return printf('%d', a:object)
     elseif object_type == v:t_string
-        return s:quote_single(a:object)
+        return incpy#string#quote_single(a:object)
     elseif object_type is v:null
         return 'None'
     elseif object_type == v:t_float
@@ -122,8 +44,8 @@ function! s:execute_python_in_workspace(package, command)
 
     " Guard whatever it is we were asked to execute by
     " ensuring that our module workspace has been loaded.
-    execute printf("pythonx (__builtins__ if isinstance(__builtins__, {}.__class__) else __builtins__.__dict__)['__import__'](%s).exec_", s:quote_single(a:package))
-    execute printf("pythonx (__builtins__ if isinstance(__builtins__, {}.__class__) else __builtins__.__dict__)['__import__'](%s)", s:quote_single(l:workspace_module))
+    execute printf("pythonx (__builtins__ if isinstance(__builtins__, {}.__class__) else __builtins__.__dict__)['__import__'](%s).exec_", incpy#string#quote_single(a:package))
+    execute printf("pythonx (__builtins__ if isinstance(__builtins__, {}.__class__) else __builtins__.__dict__)['__import__'](%s)", incpy#string#quote_single(l:workspace_module))
 
     " If our command contains 3x single or double-quotes, then
     " we format our strings with the one that isn't used.
@@ -135,29 +57,29 @@ function! s:execute_python_in_workspace(package, command)
 
     " Now we need to render our multilined list of commands to
     " a multilined string, and then execute it in our workspace.
-    let l:because_neovim = printf('(__builtins__ if isinstance(__builtins__, {}.__class__) else __builtins__.__dict__)[%s]', s:quote_single('__import__'))
-    let l:python_execute = join([printf("%s(%s)", l:because_neovim, s:quote_single(a:package)), 'exec_'], '.')
-    let l:python_workspace = join([printf("%s(%s)", l:because_neovim, s:quote_single(l:workspace_module)), 'workspace', '__dict__'], '.')
+    let l:because_neovim = printf('(__builtins__ if isinstance(__builtins__, {}.__class__) else __builtins__.__dict__)[%s]', incpy#string#quote_single('__import__'))
+    let l:python_execute = join([printf("%s(%s)", l:because_neovim, incpy#string#quote_single(a:package)), 'exec_'], '.')
+    let l:python_workspace = join([printf("%s(%s)", l:because_neovim, incpy#string#quote_single(l:workspace_module)), 'workspace', '__dict__'], '.')
 
     execute printf("pythonx (lambda F, ns: (lambda s: F(s, ns, ns)))(%s, %s)(%s)", l:python_execute, l:python_workspace, strings)
 endfunction
 
 function! s:execute_interpreter_cache(method, parameters, keywords={})
-    let l:cache = [printf('__import__(%s)', s:quote_single(g:incpy#PackageName)), 'cache']
+    let l:cache = [printf('__import__(%s)', incpy#string#quote_single(g:incpy#PackageName)), 'cache']
     let l:method = (type(a:method) == v:t_list)? a:method : [a:method]
     let l:kwparameters = len(a:keywords)? [printf('**%s', s:render_as_python(a:keywords))] : []
     call s:execute_python_in_workspace(g:incpy#PackageName, printf('%s(%s)', join(l:cache + l:method, '.'), join(a:parameters + l:kwparameters, ', ')))
 endfunction
 
 function! s:execute_interpreter_cache_guarded(method, parameters, keywords={})
-    let l:cache = [printf('__import__(%s)', s:quote_single(g:incpy#PackageName)), 'cache']
+    let l:cache = [printf('__import__(%s)', incpy#string#quote_single(g:incpy#PackageName)), 'cache']
     let l:method = (type(a:method) == v:t_list)? a:method : [a:method]
     let l:kwparameters = len(a:keywords)? [printf('**%s', s:render_as_python(a:keywords))] : []
-    call s:execute_python_in_workspace(g:incpy#PackageName, printf("hasattr(%s, %s) and %s(%s)", join(slice(l:cache, 0, -1), '.'), s:quote_single(l:cache[-1]), join(l:cache + l:method, '.'), join(a:parameters + l:kwparameters, ', ')))
+    call s:execute_python_in_workspace(g:incpy#PackageName, printf("hasattr(%s, %s) and %s(%s)", join(slice(l:cache, 0, -1), '.'), incpy#string#quote_single(l:cache[-1]), join(l:cache + l:method, '.'), join(a:parameters + l:kwparameters, ', ')))
 endfunction
 
 function! s:communicate_interpreter_encoded(format, code)
-    let l:cache = [printf('__import__(%s)', s:quote_single(g:incpy#PackageName)), 'cache']
+    let l:cache = [printf('__import__(%s)', incpy#string#quote_single(g:incpy#PackageName)), 'cache']
     let l:encoded = substitute(a:code, '.', '\=printf("\\x%02x", char2nr(submatch(0)))', 'g')
     let l:lambda = printf("(lambda interpreter: (lambda code: interpreter.communicate(code)))(%s)", join(cache, '.'))
     execute printf("pythonx %s(\"%s\".format(\"%s\"))", l:lambda, a:format, l:encoded)
@@ -165,9 +87,9 @@ endfunction
 
 " Just a utility for generating a python expression that accesses a vim global variable
 function! s:generate_gvar_expression(name)
-    let interface = [printf('__import__(%s)', s:quote_single(join([g:incpy#PackageName, 'interface'], '.'))), 'interface']
+    let interface = [printf('__import__(%s)', incpy#string#quote_single(join([g:incpy#PackageName, 'interface'], '.'))), 'interface']
     let gvars = ['vim', 'gvars']
-    return printf("%s[%s]", join(interface + gvars, '.'), s:quote_double(a:name))
+    return printf("%s[%s]", join(interface + gvars, '.'), incpy#string#quote_double(a:name))
 endfunction
 
 """ Dynamically generated python code used during setup
@@ -260,7 +182,7 @@ function! s:generate_interpreter_cache_snippet(package)
         package.cache = cache
     EOC
 
-    return printf(join(install_interpreter, "\n"), s:quote_single(a:package))
+    return printf(join(install_interpreter, "\n"), incpy#string#quote_single(a:package))
 endfunction
 
 function! s:generate_interpreter_view_snippet(package)
@@ -277,7 +199,7 @@ function! s:generate_interpreter_view_snippet(package)
         interface.vim.gvars['incpy#BufferId'] = cache.view.buffer.number
     EOC
 
-    return printf(join(create_view, "\n"), s:quote_single(a:package))
+    return printf(join(create_view, "\n"), incpy#string#quote_single(a:package))
 endfunction
 
 function! s:get_window_options(other={})
@@ -312,7 +234,7 @@ endfunction
 " Execute the specified lines within the current interpreter.
 function! incpy#Range(begin, end)
     let lines = getline(a:begin, a:end)
-    let input_stripped = s:strip_by_option(g:incpy#InputStrip, lines)
+    let input_stripped = incpy#string#strip(g:incpy#InputStrip, lines)
 
     " Verify that the input returned is a type that we support
     if index([v:t_string, v:t_list], type(input_stripped)) < 0
@@ -321,7 +243,7 @@ function! incpy#Range(begin, end)
 
     " Strip our input prior to its execution, then check its result type
     " to ensure that we can pass to the interpreter without issue.
-    let code_stripped = s:strip_by_option(g:incpy#ExecStrip, input_stripped)
+    let code_stripped = incpy#string#strip(g:incpy#ExecStrip, input_stripped)
     if !(type(code_stripped) == v:t_string || type(code_stripped) == v:t_list)
         throw printf("Unable to execute due to an unknown input type (%s) being returned by %s: %s", typename(code_stripped), 'g:incpy#ExecStrip', code_stripped)
     endif
@@ -330,7 +252,7 @@ function! incpy#Range(begin, end)
     call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
     let l:commands_stripped = (type(code_stripped) == v:t_list)? code_stripped : [code_stripped]
     for command_stripped in l:commands_stripped
-        call s:communicate_interpreter_encoded(s:singleline(g:incpy#ExecFormat, "\"\\"), command_stripped)
+        call s:communicate_interpreter_encoded(incpy#string#singleline(g:incpy#ExecFormat, "\"\\"), command_stripped)
     endfor
 
     " If the user configured us to follow the output, then do as we were told.
@@ -367,13 +289,13 @@ endfunction
 
 """ Plugin interaction interface
 function! incpy#Execute(line)
-    let input_stripped = s:strip_by_option(g:incpy#InputStrip, a:line)
+    let input_stripped = incpy#string#strip(g:incpy#InputStrip, a:line)
     if index([v:t_string, v:t_list], type(input_stripped)) < 0
         throw printf("Unable to process the given input due to it being of an unsupported type (%s): %s", typename(input_stripped), input_stripped)
     endif
 
     " Now we need to strip our input for execution.
-    let code_stripped = s:strip_by_option(g:incpy#ExecStrip, input_stripped)
+    let code_stripped = incpy#string#strip(g:incpy#ExecStrip, input_stripped)
     if !(type(code_stripped) == v:t_string || type(code_stripped) == v:t_list)
         throw printf("Unable to execute due to an unknown input type (%s) being returned by %s: %s", typename(code_stripped), 'g:incpy#ExecStrip', code_stripped)
     endif
@@ -382,7 +304,7 @@ function! incpy#Execute(line)
     call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
     let l:commands_stripped = (type(code_stripped) == v:t_list)? code_stripped : [code_stripped]
     for command_stripped in l:commands_stripped
-        call s:communicate_interpreter_encoded(s:singleline(g:incpy#ExecFormat, "\"\\"), command_stripped)
+        call s:communicate_interpreter_encoded(incpy#string#singleline(g:incpy#ExecFormat, "\"\\"), command_stripped)
     endfor
 
     " If the user configured us to follow the output, then do as we were told.
@@ -414,11 +336,11 @@ function! incpy#ExecuteSelected() range
 endfunction
 
 function! incpy#Evaluate(expr)
-    let stripped = s:strip_by_option(g:incpy#EvalStrip, a:expr)
+    let stripped = incpy#string#strip(g:incpy#EvalStrip, a:expr)
 
     " Evaluate and emit an expression in the target using the plugin
     call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
-    call s:communicate_interpreter_encoded(s:singleline(g:incpy#EvalFormat, "\"\\"), stripped)
+    call s:communicate_interpreter_encoded(incpy#string#singleline(g:incpy#EvalFormat, "\"\\"), stripped)
 
     if g:incpy#OutputFollow
         try | call incpy#ui#window#tail(g:incpy#BufferId) | catch /^Invalid/ | endtry
@@ -443,7 +365,7 @@ function! incpy#Halp(expr)
     " Execute g:incpy#HelpFormat in the target using the plugin's cached communicator
     if len(LetMeSeeYouStripped) > 0
         call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
-        call s:communicate_interpreter_encoded(s:singleline(g:incpy#HelpFormat, "\"\\"), s:escape_double(LetMeSeeYouStripped))
+        call s:communicate_interpreter_encoded(incpy#string#singleline(g:incpy#HelpFormat, "\"\\"), incpy#string#escape_double(LetMeSeeYouStripped))
     endif
 endfunction
 
@@ -452,8 +374,8 @@ function! incpy#HalpSelected() range
 endfunction
 
 function! incpy#ExecuteFile(filename)
-    let open_and_execute = printf("with open(%s) as infile: exec(infile.read())", s:quote_double(a:filename))
-    call s:execute_interpreter_cache('communicate', [s:quote_single(open_and_execute), 'silent=True'])
+    let open_and_execute = printf("with open(%s) as infile: exec(infile.read())", incpy#string#quote_double(a:filename))
+    call s:execute_interpreter_cache('communicate', [incpy#string#quote_single(open_and_execute), 'silent=True'])
 endfunction
 
 """ Internal interface for setting up the plugin loader and packages
@@ -466,8 +388,8 @@ function! incpy#SetupPackageLoader(package, path)
 
     " Next we need to use it with our parameters so that we can
     " create a hidden module to capture any python-specific work.
-    let quoted_parameters = map([l:package_name, l:package_path, g:incpy#PluginName], 's:quote_double(v:val)')
-    execute printf("pythonx __import__(%s).meta_path.extend(%s(%s))", s:quote_single('sys'), l:loader_closure_name, join(quoted_parameters, ', '))
+    let quoted_parameters = map([l:package_name, l:package_path, g:incpy#PluginName], 'incpy#string#quote_double(v:val)')
+    execute printf("pythonx __import__(%s).meta_path.extend(%s(%s))", incpy#string#quote_single('sys'), l:loader_closure_name, join(quoted_parameters, ', '))
 
     " Now that it's been used, we're free to delete it.
     execute printf("pythonx del(%s)", l:loader_closure_name)
