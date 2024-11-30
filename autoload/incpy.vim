@@ -81,14 +81,14 @@ endfunction
 
 """ Internal interface for setting up the plugin loader and packages
 function! incpy#SetupPackageLoader(package, path)
-    return incpy#python#load_package(a:package, a:path)
+    return incpy#internal#load(a:package, a:path)
 endfunction
 
 "" Setting up the interpreter and its view
 function! incpy#SetupInterpreter(package)
-    return incpy#python#setup(a:package)
+    return incpy#internal#setup(a:package)
 endfunction
 
 function! incpy#SetupInterpreterView(package)
-    return incpy#python#setup_view(a:package)
+    return incpy#internal#setup_view(a:package)
 endfunction
