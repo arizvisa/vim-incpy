@@ -1,6 +1,11 @@
 let s:PACKAGE_NAME = '__incpy__'
 let s:PLUGIN_NAME = trim(s:PACKAGE_NAME, '_')
+
+" Default name of buffer containing interpreter.
 let s:WINDOW_NAME = 'Scratch'
+
+" Default file name under home directory to use if $PYTHONSTARTUP is undefined.
+let s:PYTHONRC_FILE_NAME = '.pythonrc.py'
 
 " Default window options for plain, old, vanilla vim.
 let s:core_window_options = {
@@ -56,11 +61,16 @@ function! incpy#options#setup()
     let defopts["ExecFormat"] = "{}\n"
     let defopts["ExecStrip"] = v:false
 
-    " If the PYTHONSTARTUP environment-variable exists, then use it. Otherwise use the default one.
+    " If the PYTHONSTARTUP environment-variable exists, then use it. Otherwise,
+    " fall back to whatever the script-local variable is set to.
     if exists("$PYTHONSTARTUP")
         let defopts["PythonStartup"] = $PYTHONSTARTUP
+    elseif exists("$HOME")
+        let defopts["PythonStartup"] = printf("%s/.pythonrc.py", $HOME, s:PYTHONRC_FILE_NAME)
+    elseif exists("$USERPROFILE")
+        let defopts["PythonStartup"] = printf("%s/.pythonrc.py", $USERPROFILE, s:PYTHONRC_FILE_NAME)
     else
-        let defopts["PythonStartup"] = printf("%s/.pythonrc.py", $HOME)
+        let defopts["PythonStartup"] = v:null
     endif
 
     " Set the default window options that the user will override.
