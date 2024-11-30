@@ -1,108 +1,3 @@
-""" Utilities for dealing with visual-mode selection
-function! s:selected() range
-    " really, vim? really??
-    let oldvalue = getreg("")
-    normal gvy
-    let result = getreg("")
-    call setreg("", oldvalue)
-    return split(result, '\n')
-endfunction
-
-function! s:selected_range() range
-    let [l:left, l:right] = [getcharpos("'<"), getcharpos("'>")]
-    let [l:lline, l:rline] = [l:left[1], l:right[1]]
-    let [l:lchar, l:rchar] = [l:left[2], l:right[2]]
-
-    if l:lline < l:rline
-        let [l:minline, l:maxline] = [l:lline, l:rline]
-        let [l:minchar, l:maxchar] = [l:lchar, l:rchar]
-    elseif l:lline > l:rline
-        let [l:minline, l:maxline] = [l:rline, l:lline]
-        let [l:minchar, l:maxchar] = [l:rchar, l:lchar]
-    else
-        let [l:minline, l:maxline] = [l:lline, l:rline]
-        let [l:minchar, l:maxchar] = sort([l:lchar, l:rchar], 'N')
-    endif
-
-    let lines = getline(l:minline, l:maxline)
-    if len(lines) > 2
-        let selection = [strcharpart(lines[0], l:minchar - 1)] + slice(lines, 1, -1) + [strcharpart(lines[-1], 0, l:maxchar)]
-    elseif len(lines) > 1
-        let selection = [strcharpart(lines[0], l:minchar - 1)] + [strcharpart(lines[-1], 0, l:maxchar)]
-    else
-        let selection = [strcharpart(lines[0], l:minchar - 1, 1 + l:maxchar - l:minchar)]
-    endif
-    return selection
-endfunction
-
-function! s:selected_block() range
-    let [l:left, l:right] = [getcharpos("'<"), getcharpos("'>")]
-    let [l:lline, l:rline] = [l:left[1], l:right[1]]
-    let [l:lchar, l:rchar] = [l:left[2], l:right[2]]
-
-    if l:lline < l:rline
-        let [l:minline, l:maxline] = [l:lline, l:rline]
-        let [l:minchar, l:maxchar] = [l:lchar, l:rchar]
-    elseif l:lline > l:rline
-        let [l:minline, l:maxline] = [l:rline, l:lline]
-        let [l:minchar, l:maxchar] = [l:rchar, l:lchar]
-    else
-        let [l:minline, l:maxline] = [l:lline, l:rline]
-        let [l:minchar, l:maxchar] = sort([l:lchar, l:rchar], 'N')
-    endif
-
-    let lines = getline(l:minline, l:maxline)
-    let selection = map(lines, 'strcharpart(v:val, l:minchar - 1, 1 + l:maxchar - l:minchar)')
-    return selection
-endfunction
-
-""" Utilities for window management
-function! s:windowselect(id)
-
-    " check if we were given a bunk window id
-    if a:id == -1
-        throw printf("Invalid window identifier %d", a:id)
-    endif
-
-    " select the requested window id, return the previous window id
-    let current = winnr()
-    execute printf("%d wincmd w", a:id)
-    return current
-endfunction
-
-function! s:windowtail(bufid)
-
-    " if we were given a bunk buffer id, then we need to bitch
-    " because we can't select it or anything
-    if a:bufid == -1
-        throw printf("Invalid buffer identifier %d", a:bufid)
-    endif
-
-    " tail the window that's using the specified buffer id
-    let last = s:windowselect(bufwinnr(a:bufid))
-    if winnr() == bufwinnr(a:bufid)
-        keepjumps noautocmd normal gg
-        keepjumps noautocmd normal G
-        call s:windowselect(last)
-
-    " check which tabs the buffer is in
-    else
-        call s:windowselect(last)
-
-        let tc = tabpagenr()
-        for tn in range(tabpagenr('$'))
-            if index(tabpagebuflist(1 + tn), a:bufid) > -1
-                execute printf("tabnext %d", tn)
-                let tl = s:windowselect(bufwinnr(a:bufid))
-                keepjumps noautocmd normal gg
-                keepjumps noautocmd normal G
-                call s:windowselect(tl)
-            endif
-        endfor
-        execute printf("tabnext %d", tc)
-    endif
-endfunction
-
 function! s:striplist_by_option(option, lines)
     let items = a:lines
 
@@ -440,7 +335,7 @@ function! incpy#Range(begin, end)
 
     " If the user configured us to follow the output, then do as we were told.
     if g:incpy#OutputFollow
-        try | call s:windowtail(g:incpy#BufferId) | catch /^Invalid/ | endtry
+        try | call incpy#ui#window#tail(g:incpy#BufferId) | catch /^Invalid/ | endtry
     endif
 endfunction
 
@@ -492,7 +387,7 @@ function! incpy#Execute(line)
 
     " If the user configured us to follow the output, then do as we were told.
     if g:incpy#OutputFollow
-        try | call s:windowtail(g:incpy#BufferId) | catch /^Invalid/ | endtry
+        try | call incpy#ui#window#tail(g:incpy#BufferId) | catch /^Invalid/ | endtry
     endif
 endfunction
 
@@ -500,7 +395,7 @@ function! incpy#ExecuteRaw(line)
     call s:execute_interpreter_cache_guarded(['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), s:get_window_options())
     call s:communicate_interpreter_encoded("{}", a:line)
     if g:incpy#OutputFollow
-        try | call s:windowtail(g:incpy#BufferId) | catch /^Invalid/ | endtry
+        try | call incpy#ui#window#tail(g:incpy#BufferId) | catch /^Invalid/ | endtry
     endif
 endfunction
 
@@ -509,12 +404,12 @@ function! incpy#ExecuteRange() range
 endfunction
 
 function! incpy#ExecuteBlock() range
-    let l:block = s:selected_block()
+    let l:block = incpy#ui#selection#block()
     throw printf('Block range execution is currently not implemented')
 endfunction
 
 function! incpy#ExecuteSelected() range
-    let l:block = s:selected()
+    let l:block = incpy#ui#selection#current()
     throw printf('Selection range execution is currently not implemented')
 endfunction
 
@@ -526,20 +421,20 @@ function! incpy#Evaluate(expr)
     call s:communicate_interpreter_encoded(s:singleline(g:incpy#EvalFormat, "\"\\"), stripped)
 
     if g:incpy#OutputFollow
-        try | call s:windowtail(g:incpy#BufferId) | catch /^Invalid/ | endtry
+        try | call incpy#ui#window#tail(g:incpy#BufferId) | catch /^Invalid/ | endtry
     endif
 endfunction
 
 function! incpy#EvaluateRange() range
-    return incpy#Evaluate(join(s:selected_range()))
+    return incpy#Evaluate(join(incpy#ui#selection#range()))
 endfunction
 
 function! incpy#EvaluateBlock() range
-    return incpy#Evaluate(join(s:selected_block()))
+    return incpy#Evaluate(join(incpy#ui#selection#block()))
 endfunction
 
 function! incpy#EvaluateSelected() range
-    return incpy#Evaluate(join(s:selected()))
+    return incpy#Evaluate(join(incpy#ui#selection#current()))
 endfunction
 
 function! incpy#Halp(expr)
@@ -553,7 +448,7 @@ function! incpy#Halp(expr)
 endfunction
 
 function! incpy#HalpSelected() range
-    return incpy#Halp(join(s:selected()))
+    return incpy#Halp(join(incpy#ui#selection#current()))
 endfunction
 
 function! incpy#ExecuteFile(filename)
