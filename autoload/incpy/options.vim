@@ -76,10 +76,40 @@ function! incpy#options#setup()
     " Set the default window options that the user will override.
     let defopts["CoreWindowOptions"] = has('nvim')? s:neo_window_options : s:core_window_options
 
-    " If any of these options aren't defined during evaluation, then go through and assign them as defaults
+    " Iterate through all of the default options checking to see if any are not
+    " defined as globals. If any are not, then assign each one as a global.
     for o in keys(defopts)
         if ! exists("g:incpy#{o}")
             let g:incpy#{o} = defopts[o]
         endif
     endfor
+endfunction
+
+" Merge the default window options with the a:other and any configured window
+" options. The merged result will be returned to the caller as a dictionary.
+function! incpy#options#window(other={})
+    let core = g:incpy#CoreWindowOptions
+
+    " Initialize our result dictionary with the core window options.
+    let result = {}
+    for o in keys(core)
+        let result[o] = core[o]
+    endfor
+
+    " Specially handle the window preview option. This dictionary key isn't an
+    " option, but is used to influence the command used to create the window.
+    if exists('g:incpy#WindowPreview')
+        let result['preview'] = g:incpy#WindowPreview
+    endif
+
+    " Merge in any custom window options that were assigned.
+    for o in keys(g:incpy#WindowOptions)
+        let result[o] = g:incpy#WindowOptions[o]
+    endfor
+
+    " Merge in any of the other options that we were given.
+    for o in keys(a:other)
+        let result[o] = a:other[o]
+    endfor
+    return result
 endfunction
