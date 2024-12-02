@@ -26,7 +26,7 @@ function! incpy#ui#selection#range() range
 
     let lines = getline(l:minline, l:maxline)
     if len(lines) > 2
-        let selection = [strcharpart(lines[0], l:minchar - 1)] + slice(lines, 1, -1) + [strcharpart(lines[-1], 0, l:maxchar)]
+        let selection = [strcharpart(lines[0], l:minchar - 1)] + lines[+1 : -1] + [strcharpart(lines[-1], 0, l:maxchar)]
     elseif len(lines) > 1
         let selection = [strcharpart(lines[0], l:minchar - 1)] + [strcharpart(lines[-1], 0, l:maxchar)]
     else
