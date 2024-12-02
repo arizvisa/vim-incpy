@@ -42,7 +42,7 @@ function! incpy#internal#execute_guarded(package, method, parameters, keywords={
     let l:cache = [printf('__import__(%s)', incpy#string#quote_single(a:package)), 'cache']
     let l:method = (type(a:method) == v:t_list)? a:method : [a:method]
     let l:kwparameters = len(a:keywords)? [printf('**%s', incpy#python#render(a:keywords))] : []
-    call incpy#internal#workspace(a:package, printf("hasattr(%s, %s) and %s(%s)", join(slice(l:cache, 0, -1), '.'), incpy#string#quote_single(l:cache[-1]), join(l:cache + l:method, '.'), join(a:parameters + l:kwparameters, ', ')))
+    call incpy#internal#workspace(a:package, printf("hasattr(%s, %s) and %s(%s)", join(l:cache[0 : -1]), '.'), incpy#string#quote_single(l:cache[-1]), join(l:cache + l:method, '.'), join(a:parameters + l:kwparameters, ', ')))
 endfunction
 
 " Send the specified a:code to the interpreter that is stored within the
