@@ -66,9 +66,9 @@ function! incpy#options#setup()
     if exists("$PYTHONSTARTUP")
         let defopts["PythonStartup"] = $PYTHONSTARTUP
     elseif exists("$HOME")
-        let defopts["PythonStartup"] = printf("%s/.pythonrc.py", $HOME, s:PYTHONRC_FILE_NAME)
+        let defopts["PythonStartup"] = join(split($HOME, '/', v:true) + [s:PYTHONRC_FILE_NAME], '/')
     elseif exists("$USERPROFILE")
-        let defopts["PythonStartup"] = printf("%s/.pythonrc.py", $USERPROFILE, s:PYTHONRC_FILE_NAME)
+        let defopts["PythonStartup"] = join(split($USERPROFILE, '\', v:true) + [s:PYTHONRC_FILE_NAME], '/')
     else
         let defopts["PythonStartup"] = v:null
     endif
