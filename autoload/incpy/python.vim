@@ -1,5 +1,5 @@
 " Just a utility for generating a python expression that accesses a vim global variable
-function! s:generate_gvar_expression(name)
+function! incpy#python#global_variable(name)
     let interface = [printf('__import__(%s)', incpy#string#quote_single(join([g:incpy#PackageName, 'interface'], '.'))), 'interface']
     let gvars = ['vim', 'gvars']
     return printf("%s[%s]", join(interface + gvars, '.'), incpy#string#quote_double(a:name))
@@ -64,7 +64,7 @@ function! incpy#python#Range(begin, end)
     endif
 
     " Show the window and then send each line to the interpreter.
-    call incpy#internal#execute_guarded(g:incpy#PackageName, ['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), incpy#options#window())
+    call incpy#internal#execute_guarded(g:incpy#PackageName, ['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 'incpy#python#global_variable(v:val)'), incpy#options#window())
     let l:commands_stripped = (type(code_stripped) == v:t_list)? code_stripped : [code_stripped]
     for command_stripped in l:commands_stripped
         call incpy#internal#communicate(g:incpy#PackageName, incpy#string#singleline(g:incpy#ExecFormat, "\"\\"), command_stripped)
@@ -94,7 +94,7 @@ function! incpy#python#Restart()
 endfunction
 
 function! incpy#python#Show()
-    let parameters = map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)')
+    let parameters = map(['incpy#WindowPosition', 'incpy#WindowRatio'], 'incpy#python#global_variable(v:val)')
     call incpy#internal#execute_guarded(g:incpy#PackageName, ['show'], parameters, incpy#options#window())
 endfunction
 
@@ -116,7 +116,7 @@ function! incpy#python#Execute(line)
     endif
 
     " Show the window and send each line from our input to the interpreter.
-    call incpy#internal#execute_guarded(g:incpy#PackageName, ['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), incpy#options#window())
+    call incpy#internal#execute_guarded(g:incpy#PackageName, ['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 'incpy#python#global_variable(v:val)'), incpy#options#window())
     let l:commands_stripped = (type(code_stripped) == v:t_list)? code_stripped : [code_stripped]
     for command_stripped in l:commands_stripped
         call incpy#internal#communicate(g:incpy#PackageName, incpy#string#singleline(g:incpy#ExecFormat, "\"\\"), command_stripped)
@@ -129,7 +129,7 @@ function! incpy#python#Execute(line)
 endfunction
 
 function! incpy#python#ExecuteRaw(line)
-    call incpy#internal#execute_guarded(g:incpy#PackageName, ['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), incpy#options#window())
+    call incpy#internal#execute_guarded(g:incpy#PackageName, ['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 'incpy#python#global_variable(v:val)'), incpy#options#window())
     call incpy#internal#communicate(g:incpy#PackageName, "{}", a:line)
     if g:incpy#OutputFollow
         try | call incpy#ui#window#tail(g:incpy#BufferId) | catch /^Invalid/ | endtry
@@ -140,7 +140,7 @@ function! incpy#python#Evaluate(expr)
     let stripped = incpy#string#strip(g:incpy#EvalStrip, a:expr)
 
     " Evaluate and emit an expression in the target using the plugin
-    call incpy#internal#execute_guarded(g:incpy#PackageName, ['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), incpy#options#window())
+    call incpy#internal#execute_guarded(g:incpy#PackageName, ['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 'incpy#python#global_variable(v:val)'), incpy#options#window())
     call incpy#internal#communicate(g:incpy#PackageName, incpy#string#singleline(g:incpy#EvalFormat, "\"\\"), stripped)
 
     if g:incpy#OutputFollow
@@ -153,7 +153,7 @@ function! incpy#python#Halp(expr)
 
     " Execute g:incpy#HelpFormat in the target using the plugin's cached communicator
     if len(LetMeSeeYouStripped) > 0
-        call incpy#internal#execute_guarded(g:incpy#PackageName, ['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 's:generate_gvar_expression(v:val)'), incpy#options#window())
+        call incpy#internal#execute_guarded(g:incpy#PackageName, ['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 'incpy#python#global_variable(v:val)'), incpy#options#window())
         call incpy#internal#communicate(g:incpy#PackageName, incpy#string#singleline(g:incpy#HelpFormat, "\"\\"), incpy#string#escape_double(LetMeSeeYouStripped))
     endif
 endfunction
