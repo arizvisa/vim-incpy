@@ -4,87 +4,85 @@
 function! incpy#ImportDotfile()
     let l:dotfile = g:incpy#PythonStartup
     if filereadable(l:dotfile)
-        call incpy#ExecuteFile(l:dotfile)
+        call incpy#interpreter#execute_file(l:dotfile)
     endif
 endfunction
 
 " Execute the specified lines within the current interpreter.
 function! incpy#Range(begin, end)
-    return incpy#python#Range(a:begin, a:end)
+    return incpy#interpreter#range(a:begin, a:end)
 endfunction
 
 " Start the target program and attach it to a buffer
 function! incpy#Start()
-    return incpy#python#Start()
+    return incpy#interpreter#start()
 endfunction
 
 " Stop the target program and detach it from its buffer
 function! incpy#Stop()
-    return incpy#python#Stop()
+    return incpy#interpreter#stop()
 endfunction
 
 " Restart the target program by stopping and starting it
 function! incpy#Restart()
-    return incpy#python#Restart()
+    return incpy#interpreter#restart()
 endfunction
 
 function! incpy#Show()
-    return incpy#python#Show()
+    return incpy#interpreter#show()
 endfunction
 
 function! incpy#Hide()
-    return incpy#python#Hide()
+    return incpy#interpreter#hide()
 endfunction
 
 """ Plugin interaction interface
 function! incpy#Execute(line)
-    return incpy#python#Execute(a:line)
+    return incpy#interpreter#execute(a:line)
 endfunction
 
 function! incpy#ExecuteRaw(line)
-    return incpy#python#ExecuteRaw(a:line)
+    return incpy#interpreter#execute_raw(a:line)
 endfunction
 
 function! incpy#ExecuteRange() range
-    return incpy#Range(a:firstline, a:lastline)
+    return incpy#interpreter#execute_range()
 endfunction
 
 function! incpy#ExecuteBlock() range
-    let l:block = incpy#ui#selection#block()
-    throw printf('Block range execution is currently not implemented')
+    return incpy#interpreter#execute_block()
 endfunction
 
 function! incpy#ExecuteSelected() range
-    let l:block = incpy#ui#selection#current()
-    throw printf('Selection range execution is currently not implemented')
+    return incpy#interpreter#execute_selected()
 endfunction
 
 function! incpy#Evaluate(expr)
-    return incpy#python#Evaluate(a:expr)
+    return incpy#interpreter#evaluate(a:expr)
 endfunction
 
 function! incpy#EvaluateRange() range
-    return incpy#Evaluate(join(incpy#ui#selection#range()))
+    return incpy#interpreter#evaluate_range()
 endfunction
 
 function! incpy#EvaluateBlock() range
-    return incpy#Evaluate(join(incpy#ui#selection#block()))
+    return incpy#interpreter#evaluate_block()
 endfunction
 
 function! incpy#EvaluateSelected() range
-    return incpy#Evaluate(join(incpy#ui#selection#current()))
+    return incpy#interpreter#evaluate_selected()
 endfunction
 
 function! incpy#Halp(expr)
-    return incpy#python#Halp(a:expr)
+    return incpy#interpreter#halp(a:expr)
 endfunction
 
 function! incpy#HalpSelected() range
-    return incpy#Halp(join(incpy#ui#selection#current()))
+    return incpy#interpreter#halp_selected()
 endfunction
 
 function! incpy#ExecuteFile(filename)
-    return incpy#python#ExecuteFile(a:filename)
+    return incpy#interpreter#execute_file(a:filename)
 endfunction
 
 """ Internal interface for setting up the plugin loader and packages
