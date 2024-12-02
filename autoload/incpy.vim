@@ -1,5 +1,13 @@
 """ Public interface and management
 
+" Check to see if a python site-user dotfile exists in the users home-directory.
+function! incpy#ImportDotfile()
+    let l:dotfile = g:incpy#PythonStartup
+    if filereadable(l:dotfile)
+        call incpy#ExecuteFile(l:dotfile)
+    endif
+endfunction
+
 " Execute the specified lines within the current interpreter.
 function! incpy#Range(begin, end)
     return incpy#python#Range(a:begin, a:end)
@@ -91,4 +99,17 @@ endfunction
 
 function! incpy#SetupInterpreterView(package)
     return incpy#internal#setup_view(a:package)
+endfunction
+
+""" Plugin options and setup for keybindings and commands
+function! incpy#SetupOptions()
+    return incpy#options#setup()
+endfunction
+
+function! incpy#SetupCommands()
+    return incpy#bindings#commands()
+endfunction
+
+function! incpy#SetupKeys()
+    return incpy#bindings#setup()
 endfunction
