@@ -125,3 +125,34 @@ function! incpy#interpreter#execute_file(filename)
     let open_and_execute = printf("with open(%s) as infile: exec(infile.read())", incpy#string#quote_double(a:filename))
     call incpy#internal#execute(g:incpy#PackageName, 'communicate', [incpy#string#quote_single(open_and_execute), 'silent=True'])
 endfunction
+
+""" Wrappers that depend on the functions above.
+function! incpy#interpreter#execute_range() range
+    return incpy#interpreter#range(a:firstline, a:lastline)
+endfunction
+
+function! incpy#interpreter#execute_block() range
+    let l:block = incpy#ui#selection#block()
+    throw printf('Block range execution is currently not implemented')
+endfunction
+
+function! incpy#interpreter#execute_selected() range
+    let l:block = incpy#ui#selection#current()
+    throw printf('Selection range execution is currently not implemented')
+endfunction
+
+function! incpy#interpreter#evaluate_range() range
+    return incpy#interpreter#evaluate(join(incpy#ui#selection#range()))
+endfunction
+
+function! incpy#interpreter#evaluate_block() range
+    return incpy#interpreter#evaluate(join(incpy#ui#selection#block()))
+endfunction
+
+function! incpy#interpreter#evaluate_selected() range
+    return incpy#interpreter#evaluate(join(incpy#ui#selection#current()))
+endfunction
+
+function! incpy#interpreter#halp_selected() range
+    return incpy#interpreter#halp(join(incpy#ui#selection#current()))
+endfunction
