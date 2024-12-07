@@ -109,5 +109,7 @@ function! incpy#SetupCommands()
 endfunction
 
 function! incpy#SetupKeys()
-    return incpy#bindings#setup()
+    call incpy#bindings#mappings()
+    call incpy#bindings#keys()
+    call incpy#bindings#terminal()
 endfunction
