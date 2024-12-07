@@ -10,17 +10,18 @@ CONTENTS						*incpy-contents*
 	4. Configuration			|incpy-configuration|
 	4.1. Configuration (External)		|incpy-configuration-external|
 	5. Commands				|incpy-commands|
-	6. Public API				|incpy-functions|
-	7. Configuration Examples		|incpy-examples|
-	7.1 Example - Python			|incpy-examples-python|
-	7.2 Example - Perl			|incpy-examples-perl|
-	7.3 Example - Bash			|incpy-examples-bash|
-	7.4 Example - F#			|incpy-examples-fsharp|
-	7.5 Example - Node			|incpy-examples-nodejs|
-	7.6 Example - SWI-Prolog		|incpy-examples-prolog|
-	8. Development and Bugs			|incpy-bugs|
-	9. History				|incpy-history|
-	10. Credits				|incpy-credits|
+	6. Mappings				|incpy-mappings|
+	7. Public API				|incpy-functions|
+	8. Configuration Examples		|incpy-examples|
+	8.1 Example - Python			|incpy-examples-python|
+	8.2 Example - Perl			|incpy-examples-perl|
+	8.3 Example - Bash			|incpy-examples-bash|
+	8.4 Example - F#			|incpy-examples-fsharp|
+	8.5 Example - Node			|incpy-examples-nodejs|
+	8.6 Example - SWI-Prolog		|incpy-examples-prolog|
+	9. Development and Bugs			|incpy-bugs|
+	10. History				|incpy-history|
+	11. Credits				|incpy-credits|
 
 ==============================================================================
 INTRODUCTION							*incpy-intro*
@@ -400,6 +401,46 @@ can be called directly.
 :PyHelpSelection
 	View the |Python| help for the currently selected text. This uses the
 	|incpy#HalpSelected| public function for its implementation.
+
+==============================================================================
+MAPPINGS						*incpy-mappings*
+
+The plugin exposes the following internal mappings which can be used with the
+|<Plug>| key name to customize the keys used to execute the plugin. For more
+information, please review the |using-<Plug>| section within the manual.
+
+==============================================================
+| Mapping                        | Command                   |
+==============================================================
+| <Plug>(IncExecuteLine)         | |:PyLine|                   |
+--------------------------------------------------------------
+| <Plug>(IncExecuteRange)        | |:PyExecuteRange|           |
+--------------------------------------------------------------
+| <Plug>(IncExecuteSelection)    | |:PyExecuteSelection|       |
+--------------------------------------------------------------
+| <Plug>(IncEvaluateKeyword)     | |:PyEvaluateKeyword|        |
+--------------------------------------------------------------
+| <Plug>(IncEvaluateRange)       | |:PyEvaluateRange|          |
+--------------------------------------------------------------
+| <Plug>(IncEvaluateSelection)   | |:PyEvaluateSelection|      |
+--------------------------------------------------------------
+| <Plug>(IncHelpKeyword)         | |:PyHelpKeyword|            |
+--------------------------------------------------------------
+| <Plug>(IncHelpSelection)       | |:PyHelpSelection|          |
+--------------------------------------------------------------
+
+The following example demonstrates the using the previously listed mappings in
+order to bind them to specific keypresses.
+>
+	nnoremap !	<Plug>(IncExecuteLine)
+	vnoremap !	<Plug>(IncExecuteRange)
+	nnoremap <C-/>	<Plug>(IncEvaluateKeyword)
+	vnoremap <C-/>	<Plug>(IncEvaluateRange)
+	nnoremap <C-@>	<Plug>(IncHelpKeyword)
+	vnoremap <C-@>	<Plug>(IncHelpSelection)
+<
+These are the default mappings that are set when the plugin is loaded and is
+described in detail within the |incpy-usage| section.
 
 ==============================================================================
 PUBLIC API						*incpy-functions*
