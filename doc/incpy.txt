@@ -195,6 +195,15 @@ to be presented to the user. These options are as follows:
 	this will use the value of the |$PYTHONSTARTUP| environment variable,
 	or |$HOME/.pythonrc.py| if the environment variable is not available.
 
+:let *g:incpy#UseDefaultMappings* = (|Boolean|)
+	This variable is used by the plugin to determine whether the default
+	keybindings should be mapped. By default this is set to `v:true` and
+	is only processed when the plugin is loaded. If this global has been
+	set to `v:false`, the plugin will not map anything for |normal-mode|,
+	|visual-mode|, or |select-mode|. If this is the case, the user will
+	need to manually customize their mappings using the internal mappings
+	that are documented in the |incpy-mappings| section.
+
 ==============================================================================
 CONFIGURATION (EXTERNAL)			*incpy-configuration-external*
 
