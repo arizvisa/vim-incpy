@@ -150,7 +150,7 @@ function! incpy#LoadPlugin()
     call incpy#SetupPythonLoader(g:incpy#PackageName, s:current_script)
     call incpy#SetupPythonInterpreter(g:incpy#PackageName)
     call incpy#SetupCommands()
-    call incpy#SetupKeys()
+    call incpy#SetupBindings()
 
     " if we've been told to create a window on startup, then show the
     " window when the "VimEnter" autocmd event has been triggered.
