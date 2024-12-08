@@ -30,27 +30,60 @@ function! incpy#bindings#commands()
     command -range PyHelpSelection <line1>,<line2>call incpy#interpreter#halp_selected()
 endfunction
 
-" Set up the default key mappings for vim to use the plugin
-function! incpy#bindings#setup()
+" Set up the plugin mappings for the available commands
+function! incpy#bindings#mappings()
 
     " Execute a single or range of lines
-    nnoremap ! :PyLine<C-M>
-    vnoremap ! :PyRange<C-M>
+    nnoremap <silent> <Plug>(IncExecuteLine) :PyLine<CR>
+    xnoremap <silent> <Plug>(IncExecuteRange) :PyExecuteRange<CR>
+    xnoremap <silent> <Plug>(IncExecuteBlock) :PyExecuteBlock<CR>
+    snoremap <silent> <Plug>(IncExecuteSelection) :PyExecuteSelection<CR>
 
     " Python visual and normal mode mappings
-    nnoremap <C-/> :call incpy#interpreter#evaluate(<SID>keyword_under_cursor())<C-M>
-    vnoremap <C-/> :PyEvalRange<C-M>
+    nnoremap <silent> <Plug>(IncEvaluateKeyword) <Cmd>call incpy#interpreter#evaluate(<SID>keyword_under_cursor())<CR>
+    xnoremap <silent> <Plug>(IncEvaluteRange) :PyEvalRange<CR>
+    xnoremap <silent> <Plug>(IncEvaluteBlock) :PyEvalBlock<CR>
+    snoremap <silent> <Plug>(IncEvaluteSelection) :PyEvalSelection<CR>
 
-    nnoremap <C-\> :call incpy#interpreter#evaluate(<SID>keyword_under_cursor())<C-M>
-    vnoremap <C-\> :PyEvalRange<C-M>
+    " Normal and visual mode mappings
+    nnoremap <silent> <Plug>(IncHelpKeyword) <Cmd>call incpy#interpreter#halp(<SID>keyword_under_cursor())<CR>
+    xnoremap <silent> <Plug>(IncHelpSelection) :PyHelpSelection<CR>
+
+    " Miscellaneous mappings
+    nnoremap <silent> <Plug>(IncExecuteBuffer) :PyBuffer<CR>
+    nnoremap <silent> <Plug>(IncExecuteRaw) :PyRaw<CR>
+
+endfunction
+
+" Set up the default key mappings for vim to use the plugin
+function! incpy#bindings#keys()
+
+    " Execute a single or range of lines
+    nnoremap ! <Plug>(IncExecuteLine)
+    vnoremap ! <Plug>(IncExecuteRange)
+    snoremap ! <Plug>(IncExecuteSelection)
+
+    " Python visual and normal mode mappings
+    nnoremap <C-/> <Plug>(IncEvaluateKeyword)
+    vnoremap <C-/> <Plug>(IncEvaluateRange)
+    snoremap <C-/> <Plug>(IncEvaluateSelection)
+
+    " Some terminals don't recognize <C-/>, so we add <C-\> just in case.
+    nnoremap <C-\> <Plug>(IncEvaluateKeyword)
+    vnoremap <C-\> <Plug>(IncEvaluateRange)
+    snoremap <C-\> <Plug>(IncEvaluateSelection)
 
     " Normal and visual mode mappings for windows
-    nnoremap <C-@> :call incpy#interpreter#halp(<SID>keyword_under_cursor())<C-M>
-    vnoremap <C-@> :PyHelpSelection<C-M>
+    nnoremap <C-@> <Plug>(IncHelpKeyword)
+    vnoremap <C-@> <Plug>(IncHelpSelection)
 
     " Normal and visual mode mappings for everything else
-    nnoremap <C-S-@> :call incpy#interpreter#halp(<SID>keyword_under_cursor())<C-M>
-    vnoremap <C-S-@> :PyHelpSelection<C-M>
+    nnoremap <C-S-@> <Plug>(IncHelpKeyword)
+    vnoremap <C-S-@> <Plug>(IncHelpSelection)
+
+endfunction
+
+function! incpy#bindings#terminal()
 
     " If we have terminal support, then add a mapping that makes
     " pasting from a register similar to cmdline-mode.
@@ -62,4 +95,5 @@ function! incpy#bindings#setup()
         tnoremap <silent> <C-R>= <Cmd>call chansend(b:terminal_job_id, eval(input('=')))<CR>
         tnoremap <silent> <C-R> <Cmd>call chansend(b:terminal_job_id, getreg(nr2char(getchar())))<CR>
     endif
+
 endfunction

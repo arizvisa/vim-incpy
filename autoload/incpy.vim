@@ -108,6 +108,14 @@ function! incpy#SetupCommands()
     return incpy#bindings#commands()
 endfunction
 
-function! incpy#SetupKeys()
-    return incpy#bindings#setup()
+function! incpy#SetupBindings()
+    call incpy#bindings#mappings()
+
+    " Only setup the keybindings if the incpy#UseDefaultMappings is set.
+    if !exists('g:incpy#UseDefaultMappings') || g:incpy#UseDefaultMappings
+        call incpy#bindings#keys()
+    endif
+
+    " Set up the terminal-mode keybindings because they always make sense.
+    call incpy#bindings#terminal()
 endfunction
