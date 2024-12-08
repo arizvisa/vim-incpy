@@ -40,13 +40,13 @@ function! incpy#bindings#mappings()
     snoremap <silent> <Plug>(IncExecuteSelection) :PyExecuteSelection<CR>
 
     " Python visual and normal mode mappings
-    nnoremap <silent> <Plug>(IncEvaluateKeyword) <Cmd>call incpy#interpreter#evaluate(<SID>keyword_under_cursor())<CR>
-    xnoremap <silent> <Plug>(IncEvaluteRange) :PyEvalRange<CR>
-    xnoremap <silent> <Plug>(IncEvaluteBlock) :PyEvalBlock<CR>
-    snoremap <silent> <Plug>(IncEvaluteSelection) :PyEvalSelection<CR>
+    nnoremap <silent> <Plug>(IncEvaluateKeyword) :call incpy#interpreter#evaluate(<SID>keyword_under_cursor())<CR>
+    xnoremap <silent> <Plug>(IncEvaluateRange) :PyEvalRange<CR>
+    xnoremap <silent> <Plug>(IncEvaluateBlock) :PyEvalBlock<CR>
+    snoremap <silent> <Plug>(IncEvaluateSelection) :PyEvalSelection<CR>
 
     " Normal and visual mode mappings
-    nnoremap <silent> <Plug>(IncHelpKeyword) <Cmd>call incpy#interpreter#halp(<SID>keyword_under_cursor())<CR>
+    nnoremap <silent> <Plug>(IncHelpKeyword) :call incpy#interpreter#halp(<SID>keyword_under_cursor())<CR>
     xnoremap <silent> <Plug>(IncHelpSelection) :PyHelpSelection<CR>
 
     " Miscellaneous mappings
@@ -60,26 +60,26 @@ function! incpy#bindings#keys()
 
     " Execute a single or range of lines
     nnoremap ! <Plug>(IncExecuteLine)
-    vnoremap ! <Plug>(IncExecuteRange)
+    xnoremap ! <Plug>(IncExecuteRange)
     snoremap ! <Plug>(IncExecuteSelection)
 
     " Python visual and normal mode mappings
     nnoremap <C-/> <Plug>(IncEvaluateKeyword)
-    vnoremap <C-/> <Plug>(IncEvaluateRange)
+    xnoremap <C-/> <Plug>(IncEvaluateRange)
     snoremap <C-/> <Plug>(IncEvaluateSelection)
 
     " Some terminals don't recognize <C-/>, so we add <C-\> just in case.
     nnoremap <C-\> <Plug>(IncEvaluateKeyword)
-    vnoremap <C-\> <Plug>(IncEvaluateRange)
+    xnoremap <C-\> <Plug>(IncEvaluateRange)
     snoremap <C-\> <Plug>(IncEvaluateSelection)
 
     " Normal and visual mode mappings for windows
     nnoremap <C-@> <Plug>(IncHelpKeyword)
-    vnoremap <C-@> <Plug>(IncHelpSelection)
+    xnoremap <C-@> <Plug>(IncHelpSelection)
 
     " Normal and visual mode mappings for everything else
     nnoremap <C-S-@> <Plug>(IncHelpKeyword)
-    vnoremap <C-S-@> <Plug>(IncHelpSelection)
+    xnoremap <C-S-@> <Plug>(IncHelpSelection)
 
 endfunction
 
