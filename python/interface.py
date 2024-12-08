@@ -663,7 +663,10 @@ class buffer(object):
         return False
 
     def fileno(self):
-        raise OSError
+        from . import interpreters
+        states = (file for file in interpreters.state if file)
+        fds = (file.fileno() for file in states)
+        return next(fds, 0)
 
     def isatty(self):
         return False
