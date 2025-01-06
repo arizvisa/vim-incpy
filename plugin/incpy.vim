@@ -109,6 +109,13 @@ if exists("g:loaded_incpy") && g:loaded_incpy
 endif
 let g:loaded_incpy = v:true
 
+" Assign the current script as a script-local variable due to the issue from
+" arizvisa/vim-incpy#30. Essentially, older versions of Neovim have a bug in
+" that expand("<sfile>") returns the wrong path when called from a function.
+" This was fixed in regular Vim by the 8.2.1297 patch. So, to work around this
+" regression, we assign it at the script-level and then access it as a global.
+let s:current_script = expand("<sfile>:p:h")
+
 " Add a virtual package with the specified name referencing the given path.
 function! incpy#SetupPythonLoader(package, currentscriptpath)
     let l:slashes = substitute(a:currentscriptpath, "\\", "/", "g")
@@ -144,8 +151,6 @@ endfunction
 
 "" Entry point
 function! incpy#LoadPlugin()
-    let s:current_script=expand("<sfile>:p:h")
-
     call incpy#SetupOptions()
     call incpy#SetupPythonLoader(g:incpy#PackageName, s:current_script)
     call incpy#SetupPythonInterpreter(g:incpy#PackageName)
