@@ -706,7 +706,7 @@ class multiview(object):
             else:
                 raise NotImplementedError(k, v)
             continue
-        return '\\ '.join(result)
+        return result
 
     @classmethod
     def __create_window_split_keyword(cls, position):
@@ -747,17 +747,17 @@ class multiview(object):
 
         preview = mutable_options.pop('preview', False)
         option_keywords = cls.__create_window_options(mutable_options)
-        option_set_command = "setlocal\\ {:s}".format(option_keywords) if len(mutable_options) > 0 else ''
+        option_edit_command = '\\ '.join(['setlocal'] + option_keywords) if len(mutable_options) > 0 else ''
 
         if preview:
-            setlocal_command = "+{:s} ".format(option_set_command) if option_set_command else ''
+            setlocal_command = "+{:s} ".format(option_edit_command) if option_edit_command else ''
             vim.command("noautocmd silent {:s} pedit! {:s}{:s}".format(location_prefix, setlocal_command, "#{:d}".format(number)))
             vim.command("noautocmd silent! {:s}wincmd P".format("{:s} ".format(tabdo) if tabdo else ''))
         elif split_type:
-            setlocal_command = "+{:s} ".format(option_set_command) if option_set_command else ''
+            setlocal_command = "+{:s} ".format(option_edit_command) if option_edit_command else ''
             vim.command("noautocmd silent {:s} {:d}{:s}! {:s}{:s}".format(location_prefix, int(size), split_type, setlocal_command, "#{:d}".format(number)))
         else:
-            setlocal_command = "+{:s} ".format(option_set_command) if option_set_command else ''
+            setlocal_command = "+{:s} ".format(option_edit_command) if option_edit_command else ''
             vim.command("noautocmd silent {:s} edit! {:s}{:s}".format(location_prefix, int(size), setlocal_command, "#{:d}".format(number)))
 
         # grab the newly created window
@@ -778,6 +778,11 @@ class multiview(object):
             elif newnumber != number:
                 vim.command("buffer {:d}".format(number))
                 logger.debug("Adjusted buffer ({:d}) for window {:d} to point to the correct buffer id ({:d})".format(newnumber, new, number))
+
+            # ensure that the window options that we were configured with are
+            # applied directly to the window that was just created.
+            if len(mutable_options) > 0:
+                vim.command("{:d}windo setlocal {:s}".format(vim.window.number(new), ' '.join(option_keywords)))
 
         # select the previous window that we saved.
         finally:
