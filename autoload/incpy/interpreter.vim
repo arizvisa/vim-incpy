@@ -108,8 +108,8 @@ function! incpy#interpreter#evaluate(expr)
 
     " Evaluate an expression in the target using the plugin. If the stripped
     " expression is an empty string (or list), then there's nothing to do.
+    call incpy#internal#execute_guarded(g:incpy#PackageName, ['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 'incpy#python#global_variable(v:val)'), incpy#options#window())
     if len(stripped) > 0
-        call incpy#internal#execute_guarded(g:incpy#PackageName, ['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 'incpy#python#global_variable(v:val)'), incpy#options#window())
         call incpy#internal#communicate(g:incpy#PackageName, incpy#string#singleline(g:incpy#EvalFormat, "\"\\"), stripped)
     endif
 
