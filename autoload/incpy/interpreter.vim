@@ -47,11 +47,14 @@ function! incpy#interpreter#range(begin, end)
         throw printf("Unable to execute due to an unknown input type (%s) being returned by %s: %s", typename(code_stripped), 'g:incpy#ExecStrip', code_stripped)
     endif
 
-    " Show the window and then send each line to the interpreter.
+    " Show the window and then send each line to the interpreter. If any of the
+    " lines are empty, then avoid sending that specific line.
     call incpy#internal#execute_guarded(g:incpy#PackageName, ['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 'incpy#python#global_variable(v:val)'), incpy#options#window())
     let l:commands_stripped = (type(code_stripped) == v:t_list)? code_stripped : [code_stripped]
     for command_stripped in l:commands_stripped
-        call incpy#internal#communicate(g:incpy#PackageName, incpy#string#singleline(g:incpy#ExecFormat, "\"\\"), command_stripped)
+        if len(command_stripped) > 0
+            call incpy#internal#communicate(g:incpy#PackageName, incpy#string#singleline(g:incpy#ExecFormat, "\"\\"), command_stripped)
+        endif
     endfor
 
     " If the user configured us to follow the output, then do as we were told.
@@ -73,11 +76,14 @@ function! incpy#interpreter#execute(line)
         throw printf("Unable to execute due to an unknown input type (%s) being returned by %s: %s", typename(code_stripped), 'g:incpy#ExecStrip', code_stripped)
     endif
 
-    " Show the window and send each line from our input to the interpreter.
+    " Show the window and send each line from our input to the interpreter. If
+    " the stripped code results in an empty string, then skip over the sending.
     call incpy#internal#execute_guarded(g:incpy#PackageName, ['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 'incpy#python#global_variable(v:val)'), incpy#options#window())
     let l:commands_stripped = (type(code_stripped) == v:t_list)? code_stripped : [code_stripped]
     for command_stripped in l:commands_stripped
-        call incpy#internal#communicate(g:incpy#PackageName, incpy#string#singleline(g:incpy#ExecFormat, "\"\\"), command_stripped)
+        if len(command_stripped) > 0
+            call incpy#internal#communicate(g:incpy#PackageName, incpy#string#singleline(g:incpy#ExecFormat, "\"\\"), command_stripped)
+        endif
     endfor
 
     " If the user configured us to follow the output, then do as we were told.
@@ -100,9 +106,12 @@ endfunction
 function! incpy#interpreter#evaluate(expr)
     let stripped = incpy#string#strip(g:incpy#EvalStrip, a:expr)
 
-    " Evaluate and emit an expression in the target using the plugin
-    call incpy#internal#execute_guarded(g:incpy#PackageName, ['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 'incpy#python#global_variable(v:val)'), incpy#options#window())
-    call incpy#internal#communicate(g:incpy#PackageName, incpy#string#singleline(g:incpy#EvalFormat, "\"\\"), stripped)
+    " Evaluate an expression in the target using the plugin. If the stripped
+    " expression is an empty string (or list), then there's nothing to do.
+    if len(stripped) > 0
+        call incpy#internal#execute_guarded(g:incpy#PackageName, ['show'], map(['incpy#WindowPosition', 'incpy#WindowRatio'], 'incpy#python#global_variable(v:val)'), incpy#options#window())
+        call incpy#internal#communicate(g:incpy#PackageName, incpy#string#singleline(g:incpy#EvalFormat, "\"\\"), stripped)
+    endif
 
     if g:incpy#OutputFollow
         try | call incpy#ui#window#tail(g:incpy#BufferId) | catch /^Invalid/ | endtry
