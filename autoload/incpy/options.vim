@@ -11,7 +11,7 @@ let s:PYTHONRC_FILE_NAME = '.pythonrc.py'
 let s:core_window_options = {
 \   'buftype': has('terminal')? 'terminal' : 'nofile',
 \   'swapfile': v:false,
-\   'updatecount':0,
+\   'updatecount': 0,
 \   'buflisted': v:false,
 \   'bufhidden': 'hide',
 \}
@@ -20,7 +20,7 @@ let s:core_window_options = {
 let s:neo_window_options = {
 \   'buftype': 'nofile',
 \   'swapfile': v:false,
-\   'updatecount':0,
+\   'updatecount': 0,
 \   'buflisted': v:false,
 \   'bufhidden': 'hide',
 \}
