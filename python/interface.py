@@ -664,8 +664,20 @@ class buffer(object):
 
     def fileno(self):
         from . import interpreters
+
+        # grab the file descriptors for each steam from so that this class can
+        # be used in place of anything that takes a `file`-like object. in order
+        # to get the file descriptor number, we go through each of the cached
+        # stdio file objects, `sys.stdin`, `sys.stdout`, and `sys.stderr` from
+        # the "intepreters" module.
         states = (file for file in interpreters.state if file)
-        fds = (file.fileno() for file in states)
+
+        # on some versions of windows vim, the python extension assigns an
+        # instance of the `vim.message` object without it having a "fileno"
+        # attribute that we can access. due to this, we drop any of the stdio
+        # streams that don't have a `vim.message.fileno` method.
+        fds = (file.fileno() for file in states if callable(getattr(file, 'fileno', None)))
+
         return next(fds, 0)
 
     def isatty(self):
