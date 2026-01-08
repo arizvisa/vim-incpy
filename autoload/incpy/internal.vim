@@ -77,7 +77,7 @@ function! incpy#internal#load(package, path)
             six.exec_(infile.read(), loader.__dict__, loader.__dict__)
 
         # These are our types that are independent of the python version.
-        integer_types = tuple({type(sys.maxsize + n) for n in range(2)})
+        integer_types = tuple({type(int(getattr(sys, 'maxint', sys.maxsize) + n)) for n in range(2)})
         string_types = tuple({type(s) for s in ['', u'']})
         text_types = tuple({t.__base__ for t in string_types}) if sys.version_info.major < 3 else string_types
         ordinal_types = (string_types, bytes)
