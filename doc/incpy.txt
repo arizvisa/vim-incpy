@@ -162,8 +162,10 @@ to be presented to the user. These options are as follows:
 :let *g:incpy#WindowPosition* = (|String|) 'left', 'right', 'above', 'below'
 	The position to create the window at during execution. The position
 	specifies whether the output window should be created by vertically
-	or horizontally splitting the current window. By default this is
-	set to `"below"`.
+	or horizontally splitting the current tab. By default this is set to
+	the "below" position. If the position begins with the word "window",
+	then rather than splitting the current tab, the current window is
+	split instead.
 
 :let *g:incpy#WindowRatio* = (|Float|)
 	The ratio of the window size relative to the current window being

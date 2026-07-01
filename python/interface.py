@@ -572,7 +572,7 @@ else:
             columns, lines = cls.dimensions
             if position in {'left', 'right'}:
                 return columns
-            if position in {'above', 'below'}:
+            if position in {'above', 'below', 'top', 'bottom'}:
                 return lines
             raise ValueError(position)
 
@@ -724,16 +724,24 @@ class multiview(object):
     def __create_window_split_keyword(cls, position):
         if position in {'left', 'right'}:
             return 'vsplit'
-        elif position in {'above', 'below'}:
+        elif position in {'windowleft', 'windowright'}:
+            return 'vsplit'
+        elif position in {'above', 'below', 'top', 'bottom'}:
+            return 'split'
+        elif position in {'windowabove', 'windowbelow', 'windowtop', 'windowbottom'}:
             return 'split'
         raise ValueError(position)
 
     @classmethod
     def __create_window_location_keyword(cls, position):
-        if position in {'left', 'above'}:
+        if position in {'windowleft', 'windowtop', 'windowabove'}:
             return 'leftabove'
-        elif position in {'right', 'below'}:
+        elif position in {'windowright', 'windowbottom', 'windowbelow'}:
             return 'rightbelow'
+        elif position in {'left', 'top', 'above'}:
+            return 'topleft'
+        elif position in {'right', 'bottom', 'below'}:
+            return 'botright'
         raise ValueError(position)
 
     @classmethod
@@ -862,7 +870,16 @@ class multiview(object):
         Fkey_window_area = lambda window: (lambda width, height: width * height)(*vim.window.dimensions(window))
         Fkey_window_width = lambda window: (lambda width, height: (width * height, width))(*vim.window.dimensions(window))
         Fkey_window_height = lambda window: (lambda width, height: (width * height, height))(*vim.window.dimensions(window))
-        Fkey_window = Fkey_window_width if position in {'above', 'below'} else Fkey_window_height if position in {'left', 'right'} else Fkey_window_area
+        if position in {'above', 'below', 'top', 'bottom'}:
+            Fkey_window = Fkey_window_width
+        elif position in {'left', 'right'}:
+            Fkey_window = Fkey_window_height
+        if position in {'windowabove', 'windowbelow', 'windowtop', 'windowbottom'}:
+            Fkey_window = Fkey_window_width
+        elif position in {'windowleft', 'windowright'}:
+            Fkey_window = Fkey_window_height
+        else:
+            Fkey_window = Fkey_window_area
 
         # Now we can sort our resulting windows and grab the largest one.
         ordered = sorted(iterable, key=Fkey_window)
